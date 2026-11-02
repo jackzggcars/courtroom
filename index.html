@@ -1,0 +1,1303 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Courtroom 4B</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,700;1,6..96,500&family=Public+Sans:wght@400;500;600;700&family=Courier+Prime:wght@400;700&display=swap">
+<style>
+/* Layout concept: the judge's seat. A 3D courtroom seen from the bench on the left, the case file and rulings on a walnut side desk to the right, the record (command line) along the bottom. Palette: dark walnut, brass, legal-paper cream, seal blue. */
+:root{color-scheme:dark;
+ --bg:#14100d;--panel:#1c1611;--panel2:#261e17;--line:#3b2f24;--fg:#efe6d8;--dim:#a8957c;
+ --brass:#d0a84e;--brass2:#f0d38d;--paper:#efe7d2;--paper2:#e4d9bd;--ink:#1f1a14;--seal:#3a5f9a;
+ --ok:#82c98a;--bad:#e8735f;--warn:#e9b44c;
+ --disp:"Bodoni Moda","Didot","Bodoni 72",Georgia,serif;--body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--doc:"Courier Prime","Courier New",ui-monospace,monospace}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 var(--body);overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+#app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+/* header */
+#bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding-top:8px}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{margin:0;font:700 25px/1 var(--disp);letter-spacing:.02em;color:var(--brass2)}
+.brand span{font:500 11px var(--body);color:var(--dim);letter-spacing:.14em;text-transform:uppercase}
+.stat{display:flex;flex-direction:column;line-height:1.1;padding:3px 10px;border-left:1px solid var(--line)}
+.stat small{font:600 9.5px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.stat b{font:600 14px var(--body);font-variant-numeric:tabular-nums}
+.sp{flex:1}
+.tb{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:5px 11px;font:600 12px var(--body)}
+.tb:hover{border-color:var(--brass);color:var(--brass2)}
+#aistat{font:600 11px var(--body);color:var(--dim)}#aistat.on{color:var(--ok)}#aistat.err{color:var(--bad)}
+/* work */
+#work{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:8px;min-height:0}
+#stage{position:relative;min-height:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#0b0907}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.nm{position:absolute;left:0;top:0;transform:translate(-50%,-100%);font:600 11px var(--body);background:rgba(20,16,13,.82);border:1px solid var(--line);color:var(--fg);padding:2px 7px;border-radius:10px;white-space:nowrap;will-change:transform;transition:opacity .2s}
+.nm i{font-style:normal;color:var(--dim);font-weight:500;margin-left:5px}
+.nm.talk{border-color:var(--brass);color:var(--brass2);background:rgba(40,30,14,.92)}
+#caseplate{position:absolute;left:10px;top:10px;max-width:calc(100% - 140px);background:rgba(20,16,13,.84);border:1px solid var(--line);border-radius:3px;padding:7px 11px;pointer-events:none}
+#caseplate b{display:block;font:500 17px/1.2 var(--disp);color:var(--brass2)}
+#caseplate span{font:500 11px var(--body);color:var(--dim);letter-spacing:.05em}
+#phases{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
+#phases i{font-style:normal;font:600 9.5px var(--body);letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;border-radius:2px;background:#2a2119;color:#7a6a56}
+#phases i.on{background:var(--brass);color:#1f1505}#phases i.done{color:var(--dim)}
+#vtools{position:absolute;right:10px;top:10px;display:flex;gap:5px}
+#vtools button{background:rgba(20,16,13,.84);border:1px solid var(--line);border-radius:3px;padding:4px 9px;font:600 11px var(--body)}
+#vtools button.on{border-color:var(--brass);color:var(--brass2)}
+#sub{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:min(760px,calc(100% - 24px));text-align:center;pointer-events:none}
+#sub div{display:inline-block;background:rgba(12,9,7,.86);border-radius:4px;padding:8px 14px;font:500 15.5px/1.4 var(--body);text-wrap:balance}
+#sub div b{display:block;font:600 10.5px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin-bottom:2px}
+#sub:empty{display:none}
+#decide{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:min(680px,calc(100% - 24px));background:rgba(28,22,17,.97);border:1px solid var(--brass);border-radius:4px;padding:12px 14px;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+#decide small{font:700 10.5px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
+#decide h3{margin:3px 0 4px;font:500 19px/1.25 var(--disp);color:var(--fg);text-wrap:balance}
+#decide p{margin:0 0 9px;color:#cdbfa9;font-size:13px}
+#decide .opts{display:flex;flex-wrap:wrap;gap:6px}
+#decide .opts button{flex:1 1 180px;background:var(--panel2);border:1px solid #5a4632;border-radius:3px;padding:9px 10px;font:600 13px var(--body);text-align:left}
+#decide .opts button:hover{border-color:var(--brass);background:#33281d}
+#decide .note{margin-top:8px;font-size:12px;color:var(--dim)}
+#thinking{position:absolute;right:12px;bottom:12px;font:600 11px var(--body);color:var(--brass2);background:rgba(20,16,13,.88);border:1px solid var(--line);padding:4px 9px;border-radius:12px}
+.nogl::after{content:"The 3D courtroom needs WebGL, which this browser has turned off. The case file, transcript and rulings still work.";position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--dim)}
+/* side desk */
+#side{display:flex;flex-direction:column;min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:4px}
+#tabs{display:flex;border-bottom:1px solid var(--line)}
+#tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:9px 6px 7px;font:600 11.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+#tabs button.on{color:var(--brass2);border-bottom-color:var(--brass)}
+#tabs button em{font-style:normal;background:var(--bad);color:#fff;border-radius:8px;padding:0 5px;margin-left:4px;font-size:10px}
+.tabp{flex:1;min-height:0;overflow:auto;padding:10px 12px}
+/* file tab */
+.charge{border:1px solid var(--line);border-radius:3px;padding:8px 10px;margin-bottom:8px;background:var(--panel2)}
+.charge code{font:700 12px var(--doc);color:var(--brass2)}
+.charge div{font-weight:600;margin:2px 0}
+.charge small{color:var(--dim);font-size:12px}
+h4{margin:12px 0 6px;font:600 10.5px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.doclist{display:grid;gap:5px}
+.docbtn{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;background:var(--paper);color:var(--ink);border:0;border-radius:2px;padding:8px 10px;box-shadow:0 1px 0 rgba(0,0,0,.4)}
+.docbtn:hover{background:#fff6df}
+.docbtn .k{font:700 9.5px var(--body);letter-spacing:.1em;text-transform:uppercase;background:var(--ink);color:var(--paper);padding:2px 5px;border-radius:2px}
+.docbtn span{font:600 12.5px var(--body);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.docbtn.x{opacity:.6}.docbtn.x::after{content:"EXCLUDED";font:700 9.5px var(--body);color:#b3261e;border:1.5px solid #b3261e;padding:0 4px;border-radius:2px;letter-spacing:.08em}
+.people{display:grid;gap:4px}
+.pp{display:flex;gap:8px;align-items:baseline;font-size:13px;padding:3px 0;border-bottom:1px dotted var(--line)}
+.pp b{font-weight:600}.pp span{color:var(--dim);font-size:12px}
+.pp button{margin-left:auto;background:none;border:1px solid var(--line);border-radius:3px;font-size:11px;padding:1px 7px;color:var(--brass2)}
+/* rulings */
+.rul{border:1px solid var(--line);border-radius:3px;padding:9px 10px;margin-bottom:8px;background:var(--panel2)}
+.rul small{font:700 10px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.rul b{display:block;margin:2px 0 4px;font:500 15px/1.3 var(--disp)}
+.rul p{margin:0;font-size:12.5px;color:#cdbfa9}
+.rul .r{margin-top:6px;font:600 12px var(--body)}
+.rul .r.ok{color:var(--ok)}.rul .r.bad{color:var(--bad)}.rul .r.pend{color:var(--warn)}
+/* transcript */
+#tx{font:13px/1.5 var(--doc);color:#e5dccb}
+.ln{padding:4px 0;border-bottom:1px dotted #33281e}
+.ln b{display:block;font:700 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--brass)}
+.ln.judge b{color:#9fc3ff}.ln.judge{color:#dbe8ff}
+.ln.sys{color:var(--dim);font-style:italic;font-family:var(--body);font-size:12px}
+.ln.sys.ok{color:var(--ok)}.ln.sys.bad{color:var(--bad)}
+/* command bar */
+#cmd{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+#to{background:var(--panel);border:1px solid var(--line);border-radius:3px;color:var(--fg);padding:8px 8px;font:600 12.5px var(--body);max-width:200px}
+#msg{flex:1 1 260px;min-width:0;background:var(--panel);border:1px solid #4a3a2a;border-radius:3px;color:var(--fg);padding:9px 12px;font:500 14px var(--body)}
+#msg::placeholder{color:#7d6c58}
+.cb{background:var(--panel);border:1px solid #4a3a2a;border-radius:3px;padding:8px 13px;font:700 12.5px var(--body)}
+.cb.pri{background:var(--brass);border-color:var(--brass);color:#1f1505}
+.cb:hover{filter:brightness(1.12)}
+.cb:disabled{opacity:.45;cursor:default;filter:none}
+#mic.on{background:var(--bad);border-color:var(--bad);color:#fff}
+#gavel{display:flex;align-items:center;gap:6px}
+#gavel svg{width:18px;height:18px}
+/* overlays */
+.ov{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:rgba(8,6,4,.84);backdrop-filter:blur(3px);overflow:auto;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.card{width:min(620px,100%);background:var(--panel);border:1px solid #4a3a2a;border-radius:4px;padding:22px 24px}
+.card h2{margin:0 0 4px;font:700 34px/1.1 var(--disp);color:var(--brass2);text-wrap:balance}
+.card .sub{font:600 11px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+.card p{color:#d3c6b1;margin:8px 0}
+.card ul{margin:8px 0 12px;padding-left:18px;color:#d3c6b1}
+.card li{margin:3px 0}
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;margin:12px 0}
+.form label{display:grid;gap:4px;font:600 10.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.form .wide{grid-column:1/-1}
+input[type=text],input[type=password],input[type=number],select{background:#120e0b;border:1px solid #4a3a2a;border-radius:3px;color:var(--fg);padding:8px 10px;font:500 13.5px var(--body);width:100%;min-width:0}
+.chk{display:flex!important;align-items:center;gap:8px;text-transform:none!important;letter-spacing:0!important;font:500 13px var(--body)!important;color:var(--fg)!important}
+.chk input{width:16px;height:16px;accent-color:var(--brass)}
+.btn{background:var(--brass);color:#1f1505;border:0;border-radius:3px;padding:10px 20px;font:700 14px var(--body);letter-spacing:.06em}
+.btn.ghost{background:none;border:1px solid #5a4632;color:var(--fg)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.hint{font-size:12px;color:var(--dim)}
+.docket{display:grid;gap:5px;margin:10px 0}
+.dk{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);font-size:13px}
+.dk i{font:700 12px var(--body);font-style:normal;color:var(--dim);font-variant-numeric:tabular-nums}
+.dk b{font-weight:600}.dk span{color:var(--dim);font-size:12px}
+.dk em{font-style:normal;font:700 10px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--brass)}
+.dk.done em{color:var(--ok)}
+/* paper document */
+#docov .paper{width:min(760px,100%);background:var(--paper);color:var(--ink);border-radius:2px;padding:30px 36px 36px;font:14px/1.55 var(--doc);position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.paper .dh{text-align:center;font:700 14px var(--doc);letter-spacing:.06em;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:14px}
+.paper .dh small{display:block;font:400 11px var(--doc);letter-spacing:.1em;margin-top:3px}
+.paper table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13px}
+.paper td,.paper th{border:1px solid #8b7f66;padding:4px 7px;text-align:left;vertical-align:top}
+.paper th{background:var(--paper2)}
+.paper .fl td:first-child{width:34%;font-weight:700;background:var(--paper2)}
+.paper h5{margin:12px 0 4px;font:700 12.5px var(--doc);letter-spacing:.06em;text-transform:uppercase}
+.paper .tx{white-space:pre-wrap}
+.paper .x{position:absolute;right:14px;top:10px;background:none;border:1px solid #8b7f66;border-radius:2px;padding:3px 9px;font:700 12px var(--body);color:var(--ink)}
+.stamp{position:absolute;right:46px;top:64px;transform:rotate(-12deg);font:700 26px var(--body);letter-spacing:.12em;color:#b3261e;border:3px solid #b3261e;padding:2px 12px;opacity:.78;pointer-events:none}
+.tbl-wrap{overflow-x:auto}
+/* sentencing + results */
+.sgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.extras{display:grid;gap:6px;margin:8px 0}
+.guide{background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:8px 10px;font-size:12.5px;color:#d3c6b1}
+.res{display:grid;gap:4px;margin:10px 0}
+.res div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dotted var(--line);padding:4px 0;font-size:13px}
+.res b{font-variant-numeric:tabular-nums}
+.grade{float:right;font:700 64px/1 var(--disp);color:var(--brass2)}
+.why{background:var(--panel2);border-left:3px solid var(--brass);padding:8px 11px;margin:8px 0;font-size:13px;color:#d9ccb6}
+.why.bad{border-left-color:var(--bad)}
+@media (max-width:900px){
+ #work{grid-template-columns:1fr;grid-template-rows:minmax(260px,48vh) minmax(0,1fr)}
+ .sgrid{grid-template-columns:1fr}
+ .form{grid-template-columns:1fr}
+ .stat{display:none}.stat.keep{display:flex}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<div id="app">
+ <header id="bar">
+  <div class="brand"><h1>Courtroom 4B</h1><span>Harlan County Circuit Court</span></div>
+  <div class="stat keep"><small>Docket</small><b id="s-docket">0 / 6</b></div>
+  <div class="stat"><small>Bench score</small><b id="s-score">—</b></div>
+  <div class="stat"><small>Approval</small><b id="s-appr">60%</b></div>
+  <div class="stat"><small>Reversals</small><b id="s-rev">0</b></div>
+  <div class="sp"></div>
+  <span id="aistat">AI off</span>
+  <button class="tb" id="b-docket">Docket</button>
+  <button class="tb" id="b-set">Settings</button>
+ </header>
+ <main id="work">
+  <section id="stage">
+   <canvas id="gl"></canvas>
+   <div id="labels"></div>
+   <div id="caseplate"><b id="cp-title">Courtroom 4B</b><span id="cp-sub">Court is not in session</span><div id="phases"></div></div>
+   <div id="vtools"><button id="v-follow" class="on" title="Turn toward whoever is speaking">Follow speaker</button><button id="v-reset">Re-center</button></div>
+   <div id="sub"></div>
+   <div id="decide" hidden></div>
+   <div id="thinking" hidden>Counsel is conferring…</div>
+  </section>
+  <aside id="side">
+   <nav id="tabs"><button data-t="file" class="on">Case file</button><button data-t="rul">Rulings<em id="rul-badge" hidden>!</em></button><button data-t="tx">Transcript</button></nav>
+   <div class="tabp" id="t-file"></div>
+   <div class="tabp" id="t-rul" hidden></div>
+   <div class="tabp" id="t-tx" hidden><div id="tx"></div></div>
+  </aside>
+ </main>
+ <footer id="cmd">
+  <select id="to" aria-label="Address"></select>
+  <input id="msg" type="text" autocomplete="off" placeholder="Hold Space to speak, or type here… e.g. “Counsel, approach.”">
+  <button class="cb" id="send">Say</button>
+  <button class="cb" id="mic" title="Hold to speak (or hold Space)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16" style="vertical-align:-3px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg> Hold Space</button>
+  <button class="cb pri" id="next">Begin session</button>
+  <button class="cb" id="gavel" title="Gavel (G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 4l6 6M11 7l6 6M12.5 5.5l-6 6 3 3 6-6M8 13l-5 5 3 3 5-5M3 22h9"/></svg>Gavel</button>
+ </footer>
+</div>
+
+<div class="ov" id="intro">
+ <div class="card">
+  <div class="sub">State of Harlan · Thirteenth Judicial Circuit</div>
+  <h2>Your Honor, the court is ready.</h2>
+  <p>You are the presiding judge in Courtroom 4B. Six cases are on today's docket, from a speeding ticket to a homicide.</p>
+  <ul>
+   <li>Read the case file. The documents hide the details that decide each case: expired certificates, timestamps, who said what at the door.</li>
+   <li>Rule on pretrial motions, then on objections as they come up during testimony.</li>
+   <li><b>Hold Space and talk.</b> Say “Sustained”, “Overruled”, “Motion granted”, “Proceed”, “Not guilty”, or question anyone by name: “Officer Pike, did you pace the van?” You can also type in the line at the bottom. With a Gemini key, every person answers in character and can argue with each other.</li>
+   <li>Deliver a verdict and, where needed, a sentence within the guidelines. The appellate panel reviews every ruling.</li>
+  </ul>
+  <div class="form">
+   <label class="wide">Your name on the bench<input type="text" id="i-name" value="Judge Hollis" maxlength="40"></label>
+   <label class="wide">Gemini API key (optional)<input type="password" id="i-key" placeholder="Paste a key from Google AI Studio" autocomplete="off"></label>
+  </div>
+  <p class="hint">The key stays in this browser and is sent only to Google's Gemini API. Without one, the trial runs from its written script, and characters give short stock replies to your questions.</p>
+  <div class="row"><button class="btn" id="go">Take the bench</button><button class="btn ghost" id="go-set">More settings</button></div>
+ </div>
+</div>
+
+<div class="ov" id="setov" hidden>
+ <div class="card">
+  <div class="sub">Chambers</div>
+  <h2>Settings</h2>
+  <div class="form">
+   <label class="wide">Gemini API key<input type="password" id="s-key" autocomplete="off"></label>
+   <label>Dialogue model<input type="text" id="s-model" placeholder="gemini-3.8-flash"></label>
+   <label>Voice model<input type="text" id="s-tts" placeholder="gemini-3.8-flash-tts"></label>
+   <label class="chk wide"><input type="checkbox" id="s-ai">Characters improvise with Gemini</label>
+   <label class="chk wide"><input type="checkbox" id="s-voice">Speak lines aloud</label>
+   <label class="chk wide"><input type="checkbox" id="s-gvoice">Use Gemini voices (falls back to browser voices)</label>
+   <label class="chk wide"><input type="checkbox" id="s-auto">Proceedings continue automatically until a ruling is needed</label>
+   <label>Volume<input type="number" id="s-vol" min="0" max="100" step="5"></label>
+   <label>Reading pace (no voice)<select id="s-pace"><option value="0.7">Fast</option><option value="1">Normal</option><option value="1.4">Slow</option></select></label>
+  </div>
+  <p class="hint" id="s-err"></p>
+  <div class="row"><button class="btn" id="s-save">Save</button><button class="btn ghost" id="s-test">Test key</button><button class="btn ghost" id="s-close">Close</button></div>
+ </div>
+</div>
+
+<div class="ov" id="docov" hidden><div class="paper" id="paper"></div></div>
+<div class="ov" id="genov" hidden><div class="card" id="gencard"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script>
+/* =====================================================================
+   CASE FILES — Harlan County Circuit Court, Courtroom 4B
+   Each case: charges, people, documents, pretrial motions (with correct rulings),
+   a scripted trial backbone, hidden truth for the AI, verdict key, sentencing guide.
+   ===================================================================== */
+const STAFF={
+ clerk:{id:'clerk',name:'Rosa Imbert',role:'Courtroom Clerk',seat:'clerk',voice:'Kore',look:{skin:'#c68d5f',hair:'#2b1a10',style:'bun',suit:'#34405a',f:1},persona:'Efficient, dry, by-the-book courtroom clerk with 22 years in the building. Reads case captions crisply.'},
+ bailiff:{id:'bailiff',name:'Deputy Hank Sorensen',role:'Bailiff',seat:'bailiff',voice:'Fenrir',look:{skin:'#e6b896',hair:'#8a7a66',style:'short',suit:'#4b4f2e',f:0,h:1.06},persona:'Gruff, protective sheriff\'s deputy. Few words. Calls the room to order.'}
+};
+const ADA_COLE={id:'pros',name:'ADA Miriam Cole',role:'Assistant State Attorney',seat:'pros',voice:'Leda',look:{skin:'#f0c9a8',hair:'#5a3a22',style:'bob',suit:'#22283a',f:1},persona:'Sharp, ambitious prosecutor. Fair but aggressive. Cites rules precisely. Will concede when the law is clearly against her, grudgingly.'};
+const PD_FELD={id:'def',name:'Jonah Feld',role:'Assistant Public Defender',seat:'def',voice:'Puck',look:{skin:'#d9a982',hair:'#1f1a16',style:'curly',suit:'#5a4a3a',f:0},persona:'Overworked but passionate public defender. Rumpled. Quick with constitutional objections. Warm with clients.'};
+
+const CASES=[
+/* ------------------------------------------------------------------ 1 */
+{
+ id:'okafor',docket:'2026-TR-008841',tier:'Traffic infraction',title:'State v. Darnell Okafor',
+ short:'Speeding, 58 in a 35 zone',
+ charges:[{code:'§ 316.183(2)',desc:'Unlawful speed — 23 mph over posted limit',cls:'Noncriminal infraction'}],
+ people:[
+  {...ADA_COLE,id:'pros',name:'ADA Trevor Haines',voice:'Iapetus',look:{skin:'#e9c2a0',hair:'#c9a465',style:'short',suit:'#2c3448',f:0},persona:'Junior traffic prosecutor on his fortieth ticket of the day. Polite, a little bored, relies on the officer\'s paperwork.'},
+  {id:'def',name:'(Self-represented)',role:'Pro se',seat:'none',hidden:1},
+  {id:'dft',name:'Darnell Okafor',role:'Defendant (pro se)',seat:'def',voice:'Orus',look:{skin:'#5a3a26',hair:'#120c08',style:'short',suit:'#6b7a8c',f:0},persona:'34-year-old HVAC technician representing himself. Nervous, honest, respectful. His wife was in early labor that night. He did a little research and found the calibration problem himself.'},
+  {id:'w1',name:'Ofc. Lauren Pike',role:'Harlan PD, Traffic Unit',seat:'gallery',voice:'Despina',look:{skin:'#f1cfb1',hair:'#a5672f',style:'bun',suit:'#1d2a44',f:1,uni:1},persona:'Seven-year traffic officer. Confident, professional. Will admit the truth if asked directly, including that she did not pace the vehicle and that she did not notice the certificate date.'}
+ ],
+ truth:'Okafor was speeding, probably around 50-58 mph, rushing to Harlan General because his wife Amara was in labor (son born 4:52 AM). Officer Pike\'s Stalker radar unit #HPD-R-112 had a calibration certificate that expired 21 days before the stop, and she did not perform or log the internal tuning-fork check at the start of her shift. Under Harlan Traffic Rule 6.2, a radar reading is inadmissible without a current (12-month) calibration certificate. Pike did not pace the car; her visual estimate was "well over the limit."',
+ docs:[
+  {id:'cit',title:'Uniform Traffic Citation #HT-4418820',kind:'Citation',head:'STATE OF HARLAN — UNIFORM TRAFFIC CITATION',fields:[['Citation No.','HT-4418820'],['Date / Time','Oct 3, 2026 — 03:47'],['Location','Bayliss Ave at Cortland St (northbound)'],['Posted limit','35 mph (residential)'],['Recorded speed','58 mph'],['Method','Radar — Stalker DSR, Unit HPD-R-112'],['Driver','Darnell K. Okafor, DOB 04/11/1992'],['Vehicle','2019 Ford Transit, white, tag HRL-7Q2'],['Violation','§ 316.183(2) Unlawful speed, 20–29 over'],['Civil penalty','$256.00 + 4 points'],['Officer','Ofc. L. Pike #3317']],body:[['Officer remarks','Driver stated he was going to Harlan General. Wife in passenger seat, appeared in pain. Driver cooperative. Escort offered and declined; driver released at 03:55.']]},
+  {id:'radar',title:'Officer Shift Radar Log — Unit HPD-R-112',kind:'Log',head:'HARLAN PD — SPEED MEASURING DEVICE DAILY LOG',fields:[['Unit','Stalker DSR #HPD-R-112'],['Officer','Pike, L. #3317'],['Shift','Oct 2 22:00 – Oct 3 06:00']],table:[['Time','Check','Result','Init.'],['22:04','Internal self-test','PASS','LP'],['22:05','Tuning fork 35 mph','— not recorded —',''],['22:05','Tuning fork 65 mph','— not recorded —',''],['03:47','Enforcement: 58 mph target, NB Bayliss','Locked','LP'],['05:58','End-of-shift self-test','PASS','LP']],body:[['Note','Department Directive 14-3 requires both tuning-fork checks at start AND end of shift, recorded on this log.']]},
+  {id:'calib',title:'Radar Calibration Certificate',kind:'Certificate',head:'TRI-COUNTY INSTRUMENT LAB — CERTIFICATE OF CALIBRATION',fields:[['Device','Stalker DSR Radar, S/N 2207-18834'],['Agency asset','HPD-R-112'],['Calibrated','Sept 12, 2025'],['Valid through','Sept 12, 2026'],['Tuning forks','35 mph S/N TF-0918 / 65 mph S/N TF-0919'],['Technician','R. Abernathy, Cert. #T-2280']],body:[['Statement','This device was tested and found accurate within ±1 mph. Certification is valid for twelve (12) months from date of calibration.']],stamp:'EXPIRED'},
+  {id:'rule',title:'Harlan Traffic Rule 6.2 (excerpt)',kind:'Rule',head:'HARLAN RULES OF TRAFFIC COURT',body:[['Rule 6.2 — Speed measuring devices','(a) Evidence of speed obtained by radar is admissible only upon a showing that the device was calibrated within the twelve months preceding the measurement, as evidenced by a certificate from an approved laboratory.\n(b) Absent admissible device evidence, a conviction for unlawful speed may rest on an officer\'s testimony of pacing over a reasonable distance, or other competent evidence of speed.\n(c) An officer\'s unaided visual estimate, standing alone, is insufficient to establish a specific speed.']]},
+  {id:'hosp',title:'Harlan General — Admission Record (submitted by defendant)',kind:'Medical',head:'HARLAN GENERAL HOSPITAL — LABOR & DELIVERY',fields:[['Patient','Amara Okafor'],['Arrived','Oct 3, 2026 — 04:06'],['Status on arrival','Active labor, 7 cm'],['Delivery','04:52 — male infant, 7 lb 2 oz'],['Attending','Dr. P. Nwosu']]}
+ ],
+ motions:[
+  {id:'m1',by:'dft',title:'Defendant\'s objection to radar evidence',text:'Mr. Okafor objects to admission of the 58 mph radar reading because the calibration certificate for unit HPD-R-112 expired on September 12, 2026, three weeks before the stop.',pro:'Your Honor, the certificate says it was good for twelve months. It ran out September 12th. I got pulled over October 3rd. And the log has no tuning fork checks. I don\'t think the machine counts.',con:'Your Honor, the device passed its internal self-test at the start and end of shift. A three-week lapse is a paperwork issue, not an accuracy issue. The State asks that the reading come in.',options:['Sustain — exclude radar reading','Overrule — admit radar reading'],correct:0,why:'Rule 6.2(a) makes radar evidence admissible ONLY with a calibration within the preceding 12 months. The certificate expired Sept 12; the stop was Oct 3. The internal self-test does not substitute, and the required tuning-fork checks were never logged.',excl:['radar']}
+ ],
+ script:[
+  {who:'pros',t:'The State calls Officer Lauren Pike.'},
+  {call:'w1'},
+  {who:'clerk',t:'Raise your right hand. Do you swear the testimony you give will be the truth, the whole truth and nothing but the truth?'},
+  {who:'w1',t:'I do.'},
+  {who:'pros',t:'Officer, what happened at 3:47 on the morning of October 3rd?'},
+  {who:'w1',t:'I was stationary on Bayliss at Cortland. A white Ford Transit came northbound, visibly well over the limit. I locked it on radar and initiated a stop.'},
+  {who:'pros',t:'And absent the radar, how fast did the van appear to be traveling?'},
+  {who:'w1',t:'Visually, well over the limit. I\'d say fifty plus.'},
+  {who:'pros',t:'Did you pace the vehicle?'},
+  {who:'w1',t:'No, sir. I had the radar lock. There was no need to pace.'},
+  {who:'pros',t:'Nothing further.'},
+  {who:'dft',t:'Officer, did you do the tuning fork test before your shift?'},
+  {who:'w1',t:'...It isn\'t on the log. I ran the self-test. I can\'t say I did the forks that night.'},
+  {who:'dft',t:'And when I told you my wife was in labor, you saw she was in pain?'},
+  {who:'w1',t:'Yes. I offered an escort. He wanted to just go.'},
+  {who:'dft',t:'I have no more questions.'},
+  {who:'bailiff',t:'The witness may step down.'},
+  {back:'w1'},
+  {who:'dft',t:'Your Honor, I want to say I\'m not proud of speeding. My son was born at 4:52. That\'s all.'}
+ ],
+ closing:[
+  {who:'pros',t:'The officer observed the defendant traveling well over the limit in a residential zone at night. The State asks for a finding that he committed the infraction.'},
+  {who:'dft',t:'The machine wasn\'t calibrated, and she didn\'t pace me. I was going fast, I admit I was going over, but they can\'t prove fifty-eight. I just ask you to be fair.'}
+ ],
+ verdicts:[
+  {k:'nr',label:'Not responsible / dismissed',score:35},
+  {k:'resp',label:'Responsible — 58 mph as charged',score:0},
+  {k:'lesser',label:'Responsible — speeding 1–9 over (lesser)',score:15}
+ ],
+ verdictWhy:'With the radar excluded under Rule 6.2(a), the only speed evidence is an unaided visual estimate ("fifty plus"), which Rule 6.2(c) says cannot establish a specific speed. The State did not pace. Even his own "I was going over" does not establish an amount. The cleanest ruling is dismissal; a lesser finding on his general admission is defensible but weaker on appeal.',
+ sentence:{kind:'infraction',fine:[0,0],note:'If found responsible: civil penalty $156–$256, 3–4 points, optional basic driver improvement course in lieu of points.',guide:{fine:[156,256]},extras:[{k:'bdi',label:'Driver improvement course in lieu of points'}],need:[]}
+},
+/* ------------------------------------------------------------------ 2 */
+{
+ id:'brennan',docket:'2026-MM-002317',tier:'Misdemeanor',title:'State v. Kayla Brennan',
+ short:'Petit theft — $84.17 from a MegaMart',
+ charges:[{code:'§ 812.014(3)(a)',desc:'Petit theft, second degree (value under $100)',cls:'Misdemeanor, 2nd degree — up to 60 days jail, $500 fine'}],
+ people:[
+  ADA_COLE,PD_FELD,
+  {id:'dft',name:'Kayla Brennan',role:'Defendant',seat:'dft',voice:'Aoede',look:{skin:'#f3d4bb',hair:'#d8b46a',style:'long',suit:'#7b5e8a',f:1},persona:'26-year-old certified nursing assistant, working double shifts, behind on rent. Has one prior petit theft (2023) resolved through pretrial diversion. Defensive and embarrassed. Claims she "forgot" the earbuds were in her jacket. In truth she took them deliberately for her brother\'s birthday.'},
+  {id:'w1',name:'Dale Pruitt',role:'MegaMart Loss Prevention',seat:'gallery',voice:'Algieba',look:{skin:'#e7bc98',hair:'#3e2e22',style:'bald',suit:'#2e3b2e',f:0},persona:'Retired MP now working store loss prevention. Proud of his catch rate. Watched it live on camera. Detailed and slightly self-important. He questioned her in the back office without any police present and without Miranda warnings.'},
+  {id:'w2',name:'Ofc. Ben Arroyo',role:'Harlan PD, Patrol',seat:'gallery',voice:'Achird',look:{skin:'#c48a5e',hair:'#1a120c',style:'short',suit:'#1d2a44',f:0,uni:1},persona:'Patrol officer who arrived after the stop, took custody and wrote the report. Did not see the theft.'}
+ ],
+ truth:'On Sept 19, 2026 at Store #0412, Kayla put a $59.99 pair of SoundCore earbuds and a $24.18 phone charger into her jacket in aisle 14 (camera AISLE-14, 18:22:40), paid for $31.06 of groceries at register 6, and walked past the last point of sale. LP Dale Pruitt stopped her outside. In his office she said "I just needed them for my brother, I\'ll pay." LP is private security, not a state agent, so Miranda does not apply to that statement. Ofc. Arroyo arrived later; she did not talk to him. Her 2023 petit theft was resolved through diversion (no conviction).',
+ docs:[
+  {id:'lp',title:'MegaMart Loss Prevention Incident Report',kind:'Private report',head:'MEGAMART CORP. — ASSET PROTECTION INCIDENT REPORT',fields:[['Store','#0412, 1900 Granger Pkwy'],['Date','Sept 19, 2026'],['Agent','Dale Pruitt, AP Associate'],['Subject','Brennan, Kayla M.'],['Merchandise','SoundCore Liberty earbuds $59.99; 6ft USB-C charger $24.18'],['Total','$84.17'],['Recovered','Yes, saleable']],body:[['Narrative','At 18:21 I observed subject on camera in aisle 14 (electronics) select earbuds and charger. At 18:22:40 subject removed packaging security tab and placed both items in left inside jacket pocket. Subject proceeded to register 6, paid for grocery items ($31.06), did not present concealed items. Subject passed final point of sale and exited. I stopped subject on sidewalk 18:31 and escorted her to the AP office. Subject stated "I just needed them for my brother, I\'ll pay." HPD contacted 18:40.']]},
+  {id:'cctv',title:'CCTV Evidence Log',kind:'Evidence log',head:'MEGAMART #0412 — VIDEO RETENTION LOG',table:[['Camera','Time','Description'],['AISLE-14','18:21:05','Subject enters aisle with cart'],['AISLE-14','18:22:40','Subject removes security tab, places 2 items inside jacket'],['REG-06','18:27:12','Subject pays $31.06, groceries only; jacket closed'],['EXIT-N','18:30:58','Subject exits north doors; agent follows'],['EXIT-N','18:31:20','Agent stops subject outside']],body:[['Chain of custody','Exported to USB by D. Pruitt 9/19 20:10. Released to Ofc. B. Arroyo #2194 9/19 20:25. HPD Property #26-55871.']]},
+  {id:'pr',title:'Harlan PD Offense Report',kind:'Police report',head:'HARLAN POLICE DEPARTMENT — OFFENSE / INCIDENT REPORT',fields:[['Case #','26-118207'],['Offense','Petit theft'],['Reporting officer','Ofc. B. Arroyo #2194'],['Arrival','18:52'],['Arrest','Notice to appear issued; released']],body:[['Narrative','Responded to MegaMart #0412 re: shoplifter in custody of store LP. Reviewed video with LP Pruitt; observed concealment in aisle 14. Advised defendant of Miranda; defendant declined to make a statement. Issued NTA.']]},
+  {id:'rec',title:'Criminal History — FCIC/NCIC',kind:'Record',head:'CRIMINAL HISTORY SUMMARY',table:[['Date','Offense','Disposition'],['03/2023','Petit theft (2nd deg.)','Pretrial diversion — completed 11/2023; charge nolle prossed'],['—','Traffic','2 civil infractions (2021, 2024)']]},
+  {id:'guide',title:'Misdemeanor Sentencing Bench Card',kind:'Guide',head:'HARLAN COUNTY COURT — MISDEMEANOR BENCH CARD',body:[['Petit theft, 2nd degree','Statutory maximum: 60 days county jail and/or $500 fine.\nTypical disposition, no prior convictions: withhold of adjudication; 6–12 months probation; restitution; 20–50 hours community service; anti-theft class.\nJail is uncommon absent prior convictions.\nNote: a prior diversion is NOT a conviction.']]}
+ ],
+ motions:[
+  {id:'m1',by:'def',title:'Defense motion to suppress statement to Loss Prevention',text:'The defense moves to suppress Ms. Brennan\'s statement "I just needed them for my brother, I\'ll pay," made in the MegaMart back office, because she was not read Miranda warnings before custodial questioning.',pro:'Your Honor, my client was physically escorted to a locked back office and questioned. That\'s custody by any measure. No warnings were given. The statement must be suppressed.',con:'Judge, Mr. Pruitt is a private store employee, not a police officer. Miranda restrains government agents. There was no police involvement until after the statement. The motion fails as a matter of law.',options:['Grant — suppress statement','Deny — statement admissible'],correct:1,why:'Miranda applies only to custodial interrogation by state agents. Private loss-prevention staff acting on their own, with no police direction, are not state actors. The statement comes in.',excl:[]},
+  {id:'m2',by:'pros',title:'State\'s motion in limine: admit 2023 petit theft',text:'The State moves to introduce Ms. Brennan\'s 2023 petit theft arrest to show intent and absence of mistake.',pro:'The defense is going to claim she forgot the items were in her jacket. A prior theft rebuts accident.',con:'That 2023 case ended in diversion and a nolle prosequi. There\'s no conviction. This is propensity evidence in costume, and its prejudice swamps any value.',options:['Grant — admit the prior','Deny — exclude the prior'],correct:1,why:'Using a prior theft to show she probably stole again is propensity reasoning barred by Rule 404(b). The prior is unadjudicated diversion and adds little, since the concealment on video already rebuts "mistake." The prejudice substantially outweighs probative value (Rule 403).',excl:['rec']}
+ ],
+ script:[
+  {who:'pros',t:'The State calls Dale Pruitt.'},
+  {call:'w1'},
+  {who:'clerk',t:'Raise your right hand. Do you swear to tell the truth, the whole truth and nothing but the truth?'},
+  {who:'w1',t:'I do.'},
+  {who:'pros',t:'Mr. Pruitt, describe what you saw at 6:22 PM on September 19th.'},
+  {who:'w1',t:'On the aisle fourteen camera I watched the defendant pull the security tab off a pair of earbuds and a charger and tuck them both inside her jacket, left side.'},
+  {who:'pros',t:'Did she pay for those items?'},
+  {who:'w1',t:'No ma\'am. Register six, she paid thirty-one dollars of groceries. Jacket zipped. Walked straight out the north doors.'},
+  {who:'pros',t:'And what did your manager tell you about this customer before?'},
+  {obj:{by:'def',grounds:'Hearsay',q:'What did your manager tell you about this customer before?',correct:'sustain',why:'The question calls for an out-of-court statement by the manager offered for its truth, and it fishes for prior bad acts. Hearsay, no exception.'}},
+  {who:'pros',t:'I\'ll move on. What did the defendant say once you stopped her?'},
+  {who:'w1',t:'In the office she said, "I just needed them for my brother, I\'ll pay."'},
+  {who:'pros',t:'Nothing further.'},
+  {who:'def',t:'Mr. Pruitt, you didn\'t call the police until after you had her in a locked room, correct?'},
+  {who:'w1',t:'Standard procedure. Bring them back, get the merchandise, then call HPD.'},
+  {who:'def',t:'And you\'d agree she was tired, coming off a double shift in scrubs?'},
+  {who:'w1',t:'She was in scrubs. I don\'t know about tired.'},
+  {who:'def',t:'Nothing further.'},
+  {back:'w1'},
+  {who:'pros',t:'The State rests.'},
+  {who:'def',t:'The defense calls Kayla Brennan.'},
+  {call:'dft'},
+  {who:'def',t:'Kayla, why were those items in your jacket?'},
+  {who:'dft',t:'I was going to pay. I put them in my pocket so I didn\'t lose them in the cart, and then at the register I just... I was so tired. I forgot.'},
+  {who:'pros',t:'Ms. Brennan, you removed the security tab first, didn\'t you?'},
+  {who:'dft',t:'...It was hanging off.'},
+  {who:'pros',t:'Nothing further.'},
+  {back:'dft'}
+ ],
+ closing:[
+  {who:'pros',t:'Taking the security tab off is not forgetting. Concealment, passing every register, leaving the store, and then "I needed them for my brother." That is intent. The State asks for a guilty verdict.'},
+  {who:'def',t:'A tired woman after a sixteen-hour shift made a mistake at a self-checkout-era store. The State must prove she intended to steal. Reasonable doubt exists. Find her not guilty.'}
+ ],
+ verdicts:[
+  {k:'g',label:'Guilty of petit theft',score:35},
+  {k:'ng',label:'Not guilty',score:0}
+ ],
+ verdictWhy:'The video shows deliberate removal of the security tab and concealment, she paid for other items and walked past the last point of sale, and she made an admissible admission to private LP. Her "forgot" account is contradicted by the tab removal. Guilt is proven beyond a reasonable doubt.',
+ sentence:{kind:'misd',jailUnit:'days',jailMax:60,fineMax:500,probMax:12,guide:{jail:[0,0],fine:[0,250],prob:[6,12]},extras:[{k:'rest',label:'Restitution to MegaMart ($84.17 if unsaleable; $0 recovered)'},{k:'cs',label:'Community service (20–50 hrs)'},{k:'class',label:'Anti-theft class'},{k:'trespass',label:'Stay away from MegaMart #0412'},{k:'withhold',label:'Withhold adjudication'}],need:['cs','class'],note:'No prior convictions. Bench card: probation 6–12 months, community service, anti-theft class; jail uncommon.'}
+},
+/* ------------------------------------------------------------------ 3 */
+{
+ id:'whitlock',docket:'2026-MM-002590',tier:'Misdemeanor',title:'State v. Travis Whitlock',
+ short:'Battery — bar fight at The Rusty Anchor',
+ charges:[{code:'§ 784.03(1)(a)',desc:'Battery (intentional touching or striking against the will of another)',cls:'Misdemeanor, 1st degree — up to 1 year jail, $1,000 fine'}],
+ people:[
+  ADA_COLE,PD_FELD,
+  {id:'dft',name:'Travis Whitlock',role:'Defendant',seat:'dft',voice:'Alnilam',look:{skin:'#e3b48e',hair:'#6a4423',style:'short',suit:'#3e4a3a',f:0,h:1.07},persona:'29-year-old roofer, big, quiet. Has a 2019 disorderly conduct conviction from a college bar. Says Delgado shoved him and grabbed a bottle, and he threw one punch. That\'s the truth.'},
+  {id:'w1',name:'Ryan Delgado',role:'Complainant',seat:'gallery',voice:'Sadaltager',look:{skin:'#cf9f76',hair:'#2a1c12',style:'short',suit:'#5a2f2f',f:0},persona:'31, car salesman, the alleged victim. Had five beers. Insists the punch was unprovoked. In truth he shoved Whitlock first and picked up a beer bottle by the neck. He becomes evasive and defensive when asked about the bottle.'},
+  {id:'w2',name:'Monique Tran',role:'Bartender, The Rusty Anchor',seat:'gallery',voice:'Callirrhoe',look:{skin:'#f0d2b3',hair:'#140f0e',style:'long',suit:'#222',f:1},persona:'Bartender for 8 years. Unflappable, neutral, saw it all from four feet away. Has no stake. Saw Delgado shove first and grab a bottle.'}
+ ],
+ truth:'Aug 30, 2026, 23:41, The Rusty Anchor. Delgado, angry over a pool game, shoved Whitlock twice, then grabbed a Bud Light bottle by the neck and raised it (camera BAR-3 timestamp 23:41:08). Whitlock punched him once in the mouth at 23:41:10 and stepped back. Delgado: split lip, 3 stitches. Whitlock acted in lawful self-defense: reasonable fear of imminent harm, proportional single strike, no retreat duty in public place where lawfully present.',
+ docs:[
+  {id:'arr',title:'Arrest Affidavit',kind:'Police report',head:'HARLAN PD — ARREST AFFIDAVIT / PROBABLE CAUSE',fields:[['Case #','26-104455'],['Date / Time','Aug 30, 2026 — 23:58'],['Location','The Rusty Anchor, 77 Wharf St'],['Arrestee','Whitlock, Travis J., 29'],['Charge','Battery § 784.03'],['Officers','Sgt. C. Mabry #1102, Ofc. D. Lowe #2410']],body:[['Probable cause','Victim R. Delgado stated defendant punched him in the face without provocation. Victim had visible bleeding laceration to lower lip. Defendant stated "He came at me with a bottle." Defendant was arrested on victim\'s statement. Bar video was not reviewed at scene; owner advised it would be available next day.']]},
+  {id:'vs',title:'Sworn Statement — Ryan Delgado',kind:'Statement',head:'SWORN WITNESS STATEMENT',fields:[['Declarant','Ryan A. Delgado'],['Taken','Aug 31, 2026, 00:20, by Ofc. Lowe']],body:[['Statement','We were playing pool and there was a disagreement about a scratch on the eight ball. I told him to relax. He just came over and punched me in the mouth. I never touched him. I did not have anything in my hands.']]},
+  {id:'bs',title:'Sworn Statement — Monique Tran',kind:'Statement',head:'SWORN WITNESS STATEMENT',fields:[['Declarant','Monique T. Tran, bartender'],['Taken','Sept 2, 2026, by Det. H. Ruiz']],body:[['Statement','The guy with the red shirt (Delgado) was yelling about the pool game. He shoved the big guy (Whitlock) in the chest two times. The big guy put his hands up and said "I\'m done, man." Then red shirt grabbed an empty Bud Light off the rail by the neck and lifted it. That\'s when the big guy hit him, once. He stepped back right away. I called 911.']]},
+  {id:'vid',title:'Video Review Memo — Camera BAR-3',kind:'Evidence memo',head:'HARLAN PD — DIGITAL EVIDENCE REVIEW',fields:[['Reviewed by','Det. H. Ruiz, Sept 2, 2026'],['Source','Rusty Anchor NVR, Camera BAR-3 (rail, pool table 2)']],table:[['Timestamp','Observation'],['23:40:51','Delgado shoves Whitlock (two-handed, chest)'],['23:40:56','Delgado shoves Whitlock again; Whitlock raises open palms'],['23:41:08','Delgado picks up bottle by neck from rail, raises to shoulder height'],['23:41:10','Whitlock strikes Delgado once (right hand, face)'],['23:41:12','Whitlock steps back 3 paces; no further contact']]},
+  {id:'med',title:'ER Record — Ryan Delgado',kind:'Medical',head:'ST. BRIGID MEDICAL CENTER — EMERGENCY DEPT.',fields:[['Arrival','Aug 31, 00:42'],['Injury','1.5 cm laceration, lower lip; no fracture'],['Treatment','3 sutures; discharged 01:50'],['Note','Patient smells of alcohol; BAC not drawn']]},
+  {id:'prior',title:'Defendant\'s Prior Record',kind:'Record',head:'CRIMINAL HISTORY SUMMARY',table:[['Date','Offense','Disposition'],['10/2019','Disorderly conduct (college bar)','Adjudicated guilty; $250 fine']]},
+  {id:'jury',title:'Standard Instruction 3.6(f) — Self-Defense (non-deadly force)',kind:'Instruction',head:'STANDARD JURY INSTRUCTIONS (CRIMINAL)',body:[['Justifiable use of non-deadly force','A person is justified in using non-deadly force when and to the extent he reasonably believes such conduct is necessary to defend himself against another\'s imminent use of unlawful force. A person who is not engaged in criminal activity and is in a place where he has a right to be has no duty to retreat. Once the defense is raised, the State must prove beyond a reasonable doubt that the defendant did not act in self-defense.']]}
+ ],
+ motions:[
+  {id:'m1',by:'def',title:'Defense motion in limine: exclude 2019 disorderly conduct',text:'The defense moves to exclude Mr. Whitlock\'s 2019 disorderly conduct conviction from the State\'s case.',pro:'Your Honor, a seven-year-old bar disturbance has one use here: to say "he\'s the kind of guy who fights in bars." That is exactly what Rule 404 forbids.',con:'Judge, it goes to motive and to rebut his claim that he was peaceable. The jury should know he has a history in bars.',options:['Grant — exclude the prior','Deny — admit the prior'],correct:0,why:'The only inference is character/propensity ("he fights in bars"), barred by Rule 404(a)/(b). Disorderly conduct is not a crime of dishonesty usable for impeachment either.',excl:['prior']}
+ ],
+ script:[
+  {who:'pros',t:'The State calls Ryan Delgado.'},
+  {call:'w1'},
+  {who:'clerk',t:'Raise your right hand. Do you swear to tell the truth, the whole truth and nothing but the truth?'},
+  {who:'w1',t:'I do.'},
+  {who:'pros',t:'Mr. Delgado, what happened at the pool table?'},
+  {who:'w1',t:'We had an argument about a scratch. I said relax. He walked up and punched me in the face. I needed stitches.'},
+  {who:'pros',t:'Nothing further.'},
+  {who:'def',t:'Mr. Delgado, how many beers had you had?'},
+  {who:'w1',t:'A couple.'},
+  {who:'def',t:'Isn\'t it true you shoved Mr. Whitlock twice, then picked up a bottle and raised it over your shoulder?'},
+  {who:'w1',t:'I... maybe I pushed him. I don\'t remember a bottle.'},
+  {who:'def',t:'Isn\'t it true you\'re a violent drunk who started this because you lost twenty dollars on pool?'},
+  {obj:{by:'pros',grounds:'Argumentative / improper character',q:'Isn\'t it true you\'re a violent drunk who started this because you lost twenty dollars?',correct:'sustain',why:'Calling the witness "a violent drunk" is argumentative and an improper character attack, not a question of fact.'}},
+  {who:'def',t:'I\'ll rephrase. You had money riding on that game?'},
+  {who:'w1',t:'Twenty bucks. So what.'},
+  {who:'def',t:'Nothing further.'},
+  {back:'w1'},
+  {who:'pros',t:'The State rests.'},
+  {who:'def',t:'The defense calls Monique Tran.'},
+  {call:'w2'},
+  {who:'clerk',t:'Raise your right hand. Do you swear to tell the truth?'},
+  {who:'w2',t:'I do.'},
+  {who:'def',t:'Ms. Tran, what did you see right before the punch?'},
+  {who:'w2',t:'Red shirt shoved him twice. The big guy put his hands up, said "I\'m done, man." Then red shirt grabbed an empty bottle off the rail by the neck and raised it. Then the punch. One punch, and he backed off.'},
+  {who:'pros',t:'Ms. Tran, it was a busy Saturday night. You were pouring drinks.'},
+  {who:'w2',t:'I was four feet away. It was the only thing happening at that end of the bar.'},
+  {who:'pros',t:'Nothing further.'},
+  {back:'w2'}
+ ],
+ closing:[
+  {who:'pros',t:'Mr. Delgado left that bar with three stitches. The defendant chose to throw a punch instead of walking away. That is battery.'},
+  {who:'def',t:'Two shoves, open palms, "I\'m done, man," and then a bottle raised at shoulder height. The video and a neutral bartender say the same thing. One punch, then he stepped back. That\'s textbook self-defense, and the State hasn\'t disproved it beyond a reasonable doubt.'}
+ ],
+ verdicts:[
+  {k:'ng',label:'Not guilty — self-defense',score:35},
+  {k:'g',label:'Guilty of battery',score:0}
+ ],
+ verdictWhy:'The bar video (23:41:08 bottle raised; 23:41:10 strike) and the neutral bartender establish an imminent threat of unlawful force, one proportionate strike, and immediate withdrawal. There is no duty to retreat. The State must disprove self-defense beyond a reasonable doubt and cannot. Not guilty.',
+ sentence:{kind:'misd',jailUnit:'days',jailMax:365,fineMax:1000,probMax:12,guide:{jail:[0,30],fine:[0,500],prob:[6,12]},extras:[{k:'nc',label:'No contact with victim'},{k:'anger',label:'Anger management'},{k:'rest',label:'Restitution — ER bill'}],need:['nc'],note:'If convicted: first-degree misdemeanor.'}
+},
+/* ------------------------------------------------------------------ 4 */
+{
+ id:'paxton',docket:'2026-CT-001184',tier:'Criminal traffic',title:'State v. Gloria Paxton',
+ short:'DUI — headlights off at 2:10 AM',
+ charges:[{code:'§ 316.193(1)',desc:'Driving under the influence (normal faculties impaired, or BAC 0.08+)',cls:'Misdemeanor — first offense: up to 6 months jail, $500–$1,000 fine'}],
+ people:[
+  ADA_COLE,
+  {...PD_FELD,id:'def',name:'Harold Kim, Esq.',role:'Private defense counsel',voice:'Rasalgethi',look:{skin:'#e8c39a',hair:'#bdbdbd',style:'short',suit:'#2b2b33',f:0},persona:'Silver-haired private DUI specialist. Methodical, courteous, merciless about procedure and the 20-minute observation rule.'},
+  {id:'dft',name:'Gloria Paxton',role:'Defendant',seat:'dft',voice:'Sulafat',look:{skin:'#efc7a3',hair:'#7a2e1e',style:'bob',suit:'#3a5a6a',f:1},persona:'48-year-old dental office manager, no record. Mortified. Had three glasses of wine at a retirement party. Will not testify unless the judge asks her a direct question; if asked, she is honest that she drank three glasses.'},
+  {id:'w1',name:'Dep. Carl Whitfield',role:'Harlan County Sheriff\'s Office',seat:'gallery',voice:'Schedar',look:{skin:'#d8a77c',hair:'#4a3020',style:'short',suit:'#4b4f2e',f:0,uni:1},persona:'Twelve-year deputy, DRE-trained, confident about field sobriety. He started the 20-minute observation late because he was finishing paperwork in the cruiser, and he will say so under direct questioning.'}
+ ],
+ truth:'Oct 11, 2026, 02:10, Gloria was driving on Route 9 with headlights OFF (valid basis for the stop). Odor of alcohol, glassy eyes, slight slur. Walk-and-turn: 4 of 8 clues; one-leg stand: 2 of 4; HGN: 4 of 6. Admitted "three glasses of wine." Intoxilyzer 9000 at 02:44 read 0.091/0.089. But the deputy only began the mandatory 20-minute deprivation/observation period at 02:31, so it lasted 13 minutes. Under Admin. Rule 11D-8.007 the breath results are inadmissible. Impairment can still be proven by the driving pattern, observations, and FSTs.',
+ docs:[
+  {id:'ar',title:'DUI Arrest Report',kind:'Police report',head:'HARLAN COUNTY SHERIFF\'S OFFICE — DUI ARREST REPORT',fields:[['Case #','HCSO-26-30981'],['Date / Time of stop','Oct 11, 2026 — 02:10'],['Location','Route 9 SB near mile marker 14'],['Driver','Paxton, Gloria R., 48'],['Vehicle','2022 Honda CR-V, grey'],['Deputy','Dep. C. Whitfield #618']],body:[['Reason for stop','Vehicle traveling southbound with headlights not illuminated, in darkness, approx. 45 mph. Vehicle drifted once within its lane; no lane violation.'],['Observations','Strong odor of alcoholic beverage from vehicle interior and breath. Eyes glassy and bloodshot. Speech slightly slurred. Fumbled with registration. Driver stated she was coming from a retirement party and had "three glasses of wine."']]},
+  {id:'fst',title:'Field Sobriety Exercises Worksheet',kind:'Worksheet',head:'STANDARDIZED FIELD SOBRIETY TESTS',fields:[['Conditions','Dry, level asphalt, lit by cruiser lights; driver in flat shoes'],['Medical','Denies injuries, contacts or medication']],table:[['Exercise','Clues observed','Decision point'],['Horizontal gaze nystagmus','4 of 6','4'],['Walk-and-turn','4 of 8 (stepped off line, wrong # steps, used arms, improper turn)','2'],['One-leg stand','2 of 4 (swayed, put foot down at count 11)','2']],body:[['Deputy\'s opinion','Normal faculties impaired. Arrested 02:22.']]},
+  {id:'obs',title:'Breath Test Observation Log',kind:'Log',head:'20-MINUTE DEPRIVATION / OBSERVATION PERIOD',fields:[['Subject','Paxton, G.'],['Observer','Dep. Whitfield #618'],['Observation began','02:31'],['Mouth checked','02:31 — clear'],['Burp/vomit/regurgitation','None observed'],['Breath sample 1','02:44'],['Breath sample 2','02:47']],body:[['Note','Transport from scene 02:24–02:29. Deputy completed tow inventory in cruiser 02:29–02:31.']]},
+  {id:'ticket',title:'Intoxilyzer 9000 Breath Test Result',kind:'Instrument ticket',head:'INTOXILYZER 9000 — S/N 80-004211',table:[['Test','Time','Result (g/210L)'],['Air blank','02:43','.000'],['Subject sample 1','02:44','.091'],['Air blank','02:45','.000'],['Subject sample 2','02:47','.089']],body:[['Agency inspection','Last monthly inspection 10/02/2026 — in compliance']]},
+  {id:'rule',title:'Admin. Rule 11D-8.007 (excerpt)',kind:'Rule',head:'DEPT. OF LAW ENFORCEMENT — BREATH TEST RULES',body:[['11D-8.007(3)','The breath test operator shall reasonably ensure that the subject has not taken anything by mouth or regurgitated for at least twenty (20) minutes before administration of the test. Results from a test conducted without the full twenty-minute period are not admissible as evidence of breath alcohol level.']]},
+  {id:'sent',title:'DUI Sentencing Requirements — First Offense',kind:'Guide',head:'MANDATORY & DISCRETIONARY TERMS — § 316.193',body:[['First conviction, BAC under 0.15 or unknown','Fine $500–$1,000. Probation up to 1 year. 50 hours community service (mandatory). DUI school Level I (mandatory). Vehicle impoundment 10 days (mandatory unless family hardship). License revocation 180 days–1 year. Jail up to 6 months (not mandatory).']]}
+ ],
+ motions:[
+  {id:'m1',by:'def',title:'Defense motion to suppress: unlawful stop',text:'The defense moves to suppress all evidence from the stop, arguing a single drift within the lane is not reasonable suspicion.',pro:'Your Honor, drifting within one\'s own lane once is not a traffic violation and not reasonable suspicion of impairment. Everything that followed is fruit of an illegal stop.',con:'Judge, the report is clear: her headlights were off on an unlit highway at 2:10 AM. That is an independent traffic violation. The weave is irrelevant.',options:['Grant — suppress everything','Deny — stop was lawful'],correct:1,why:'Driving at night without headlights is a traffic violation that independently justifies the stop. The single in-lane drift doesn\'t matter.',excl:[]},
+  {id:'m2',by:'def',title:'Defense motion to exclude breath test results',text:'The defense moves to exclude the 0.091/0.089 Intoxilyzer results because the 20-minute observation period was not completed.',pro:'Observation began at 02:31. The first sample was 02:44. That is thirteen minutes, not twenty. Rule 11D-8.007 says the results are not admissible. Full stop.',con:'Judge, she was with a deputy from 02:22 on, in the back of a cruiser. The spirit of the rule was satisfied.',options:['Grant — exclude breath results','Deny — admit breath results'],correct:0,why:'The log itself shows 13 minutes of formal observation; transport and paperwork time when the deputy was not watching her mouth does not count. The rule says such results are inadmissible.',excl:['ticket']}
+ ],
+ script:[
+  {who:'pros',t:'The State calls Deputy Carl Whitfield.'},
+  {call:'w1'},
+  {who:'clerk',t:'Raise your right hand. Do you swear to tell the truth, the whole truth and nothing but the truth?'},
+  {who:'w1',t:'I do.'},
+  {who:'pros',t:'Deputy, why did you stop the defendant?'},
+  {who:'w1',t:'Headlights off on Route 9, two in the morning, no streetlights. I lit her up.'},
+  {who:'pros',t:'What did you observe once you made contact?'},
+  {who:'w1',t:'Strong odor of alcohol, glassy bloodshot eyes, slurred speech. She fumbled with her registration. She told me three glasses of wine.'},
+  {who:'pros',t:'And the field exercises?'},
+  {who:'w1',t:'Four of six clues on HGN, four of eight on walk-and-turn, two of four on one-leg stand. In my opinion, her normal faculties were impaired.'},
+  {who:'pros',t:'Deputy, the defendant was obviously drunk, wasn\'t she?'},
+  {obj:{by:'def',grounds:'Leading',q:'The defendant was obviously drunk, wasn\'t she?',correct:'sustain',why:'On direct examination counsel may not suggest the answer to her own witness. Leading question.'}},
+  {who:'pros',t:'Withdrawn. Nothing further.'},
+  {who:'def',t:'Deputy, the observation log says you began watching her at 2:31.'},
+  {who:'w1',t:'That\'s when I started the formal twenty.'},
+  {who:'def',t:'And the first breath sample was at 2:44.'},
+  {who:'w1',t:'...Yes, sir. I was doing the tow sheet before that.'},
+  {who:'def',t:'Conditions for walk-and-turn: no painted line, correct?'},
+  {who:'w1',t:'Imaginary line. That\'s standard.'},
+  {who:'def',t:'Nothing further.'},
+  {back:'w1'},
+  {who:'pros',t:'The State rests.'},
+  {who:'def',t:'The defense rests, Your Honor. Ms. Paxton will not testify.'}
+ ],
+ closing:[
+  {who:'pros',t:'Headlights off on a dark highway. Odor, glassy eyes, slurred speech, an admission to drinking, and she failed all three standardized exercises. Her normal faculties were impaired.'},
+  {who:'def',t:'Without the breath test, the State has a forgetful moment with headlights, one drift inside her lane, and tests done on an imaginary line at 2 AM. That\'s not proof beyond a reasonable doubt.'}
+ ],
+ verdicts:[
+  {k:'g',label:'Guilty of DUI (impairment)',score:35},
+  {k:'ng',label:'Not guilty',score:12},
+  {k:'reck',label:'Guilty of reckless driving (lesser, "wet reckless")',score:18}
+ ],
+ verdictWhy:'Even with the breath results excluded, the "impairment" prong is well supported: headlights off at night, odor, glassy eyes, slurred speech, admitted drinking, and decision points met on all three standardized tests. Guilty of DUI is the strongest ruling. A not-guilty finding would not be reversed, but it underweights solid impairment evidence.',
+ sentence:{kind:'misd',jailUnit:'days',jailMax:180,fineMax:1000,fineMin:500,probMax:12,guide:{jail:[0,0],fine:[500,1000],prob:[6,12]},extras:[{k:'cs',label:'50 hrs community service'},{k:'school',label:'DUI school Level I'},{k:'imp',label:'Vehicle impound 10 days'},{k:'lic',label:'License revocation 180 days'},{k:'iid',label:'Ignition interlock'}],need:['cs','school','imp','lic'],note:'First offense, breath result excluded. Mandatory: fine $500–$1,000, 50 hrs CS, DUI school, 10-day impound, license revocation.'}
+},
+/* ------------------------------------------------------------------ 5 */
+{
+ id:'hale',docket:'2026-CF-000731',tier:'Felony',title:'State v. Marcus Hale',
+ short:'Burglary of a dwelling, 412 Elm Street',
+ charges:[{code:'§ 810.02(3)(b)',desc:'Burglary of an unoccupied dwelling',cls:'Felony, 2nd degree — up to 15 years prison'},{code:'§ 812.014(2)(c)',desc:'Grand theft ($750–$5,000)',cls:'Felony, 3rd degree — up to 5 years'}],
+ people:[
+  ADA_COLE,PD_FELD,
+  {id:'dft',name:'Marcus Hale',role:'Defendant',seat:'dft',voice:'Enceladus',look:{skin:'#7a4e33',hair:'#0f0a07',style:'short',suit:'#4a4a52',f:0},persona:'33, unemployed warehouse worker, two prior grand theft convictions (2018, 2021). Sullen, tense, insists he was home all night. He did the burglary and pawned the watch. Will not testify unless asked directly; if he does, he lies but poorly.'},
+  {id:'w1',name:'Det. Sharon Vick',role:'Harlan PD, Property Crimes',seat:'gallery',voice:'Gacrux',look:{skin:'#e9c09a',hair:'#3a2a1e',style:'bun',suit:'#3a3a44',f:1},persona:'Seasoned burglary detective. Thorough but cut a corner on the apartment search, relying on the girlfriend\'s consent while Hale objected at the door. Will admit Hale said "no" if pressed.'},
+  {id:'w2',name:'Gene Albright',role:'Neighbor (418 Elm)',seat:'gallery',voice:'Umbriel',look:{skin:'#f4d8c4',hair:'#e8e8e8',style:'bald',suit:'#6b5a40',f:0},persona:'74-year-old retired mailman. Saw a man in a grey hoodie at dusk from 60 feet. Was shown a single photo of Hale three days later and said "that\'s probably him." Sincere but uncertain; wears glasses he wasn\'t wearing that evening.'},
+  {id:'w3',name:'Dr. Nadia Fenn',role:'Latent Print Examiner, County Crime Lab',seat:'gallery',voice:'Erinome',look:{skin:'#c99a72',hair:'#2a1c16',style:'long',suit:'#2c3a4a',f:1},persona:'Precise forensic examiner, 15 years experience, IAI certified. Explains ACE-V methodology clearly. Verified by a second examiner.'}
+ ],
+ truth:'Sept 4, 2026, ~19:30, Hale pried the rear kitchen window of 412 Elm (owners Joan and Raymond Ostrowski away for the weekend) and took a MacBook Pro ($1,900), jewelry ($1,250) and a Tag Heuer watch ($1,600). On Sept 6 he pawned the watch at Gold Star Pawn under his own ID with a thumbprint. On Sept 8 Det. Vick did a "knock and talk" at his apartment: Hale, present at the door, said "You\'re not coming in without a warrant." His girlfriend and co-tenant Tasha Reyes then consented, and officers found the laptop and jewelry. Under Georgia v. Randolph, a physically present co-occupant\'s express refusal overrides the other occupant\'s consent: the apartment evidence must be suppressed. The neighbor ID came from a single-photo showup 3 days later (unnecessarily suggestive, low reliability). But Hale\'s fingerprint was found on the INSIDE of the pried window sill, and the Ostrowskis have never met him; plus the pawn record. Those are independent and sufficient.',
+ docs:[
+  {id:'inc',title:'Burglary Offense Report',kind:'Police report',head:'HARLAN PD — OFFENSE REPORT',fields:[['Case #','26-109932'],['Reported','Sept 7, 2026 09:15'],['Location','412 Elm Street (single-family)'],['Victims','Joan & Raymond Ostrowski'],['Entry','Rear kitchen window, pried; tool marks on frame'],['Loss','MacBook Pro 16" S/N C02XL9J ($1,900); gold jewelry, 7 pcs ($1,250); Tag Heuer Carrera, engraved "R.O. 1999" ($1,600)'],['Total','$4,750']],body:[['Victim statement','Victims away Sept 4–7 at daughter\'s in Raleigh. They do not know anyone named Marcus Hale and have never had him in their home.']]},
+  {id:'srch',title:'Supplement — Apartment Search, 2215 Pine Ct #3B',kind:'Police supplement',head:'HARLAN PD — SUPPLEMENTARY REPORT',fields:[['Author','Det. S. Vick #881'],['Date','Sept 8, 2026, 17:40'],['Warrant','None — consent search']],body:[['Narrative','Knocked at #3B. Marcus Hale answered and stated, "You\'re not coming in without a warrant." Tasha Reyes, co-tenant on the lease, came to the door and stated, "Just let them look, I don\'t want trouble." Ms. Reyes signed consent form. Hale remained in doorway and repeated objection. Officers entered and located a MacBook Pro (S/N C02XL9J) under bedroom mattress and a plastic bag of gold jewelry in a dresser. Hale arrested.']]},
+  {id:'id',title:'Supplement — Eyewitness Identification',kind:'Police supplement',head:'HARLAN PD — IDENTIFICATION PROCEDURE',fields:[['Witness','Eugene Albright, 74, 418 Elm'],['Date','Sept 10, 2026'],['Procedure','Single photograph shown (Hale booking photo)'],['Administrator','Det. Vick (case detective)'],['Lighting at event','Dusk, approx. 19:30; distance ~60 ft'],['Glasses','Witness states he was not wearing distance glasses']],body:[['Result','Witness viewed photo, stated: "That\'s probably him. The hoodie guy." Confidence not recorded.']]},
+  {id:'print',title:'Latent Print Examination Report',kind:'Lab report',head:'HARLAN COUNTY CRIME LABORATORY — LATENT PRINTS',fields:[['Lab #','L26-2240'],['Examiner','Nadia Fenn, PhD, IAI CLPE'],['Item','Lift #3: interior sill, rear kitchen window, 412 Elm'],['Comparison','Known prints of Marcus D. Hale (DOB 1993)'],['Method','ACE-V; verified blind by examiner T. Osei']],body:[['Conclusion','Lift #3 was IDENTIFIED to the right thumb of Marcus D. Hale. Sufficient agreement in ridge detail; 16 corresponding minutiae.']]},
+  {id:'pawn',title:'Gold Star Pawn — Transaction Record',kind:'Business record',head:'GOLD STAR PAWN & LOAN — PURCHASE TICKET',fields:[['Ticket','GS-77013'],['Date','Sept 6, 2026, 11:52'],['Seller','Marcus D. Hale, DL H400-552-93-118'],['Item','Tag Heuer Carrera, engraved caseback "R.O. 1999"'],['Paid','$420.00'],['Thumbprint','On file (right thumb)']],body:[['Note','Record obtained via county pawn database and subpoena to Gold Star; independent of the apartment search.']]},
+  {id:'score',title:'Felony Sentencing Scoresheet',kind:'Scoresheet',head:'CRIMINAL PUNISHMENT CODE SCORESHEET',table:[['Component','Points'],['Primary: Burglary of dwelling (Level 7)','56.0'],['Additional: Grand theft 3rd (Level 3)','2.4'],['Prior: Grand theft 2018 (Level 3)','1.6'],['Prior: Grand theft 2021 (Level 3)','1.6'],['Total sentence points','61.6']],body:[['Lowest permissible sentence','(61.6 − 28) × 0.75 = 25.2 months state prison'],['Maximum','15 years (Burglary, F2) consecutive with 5 years (Grand theft, F3)'],['Typical range in this circuit','25–60 months prison, followed by probation; restitution to victims']]}
+ ],
+ motions:[
+  {id:'m1',by:'def',title:'Motion to suppress evidence from apartment search',text:'The defense moves to suppress the MacBook and jewelry found at 2215 Pine Ct #3B, arguing Mr. Hale, a present co-tenant, expressly refused consent.',pro:'Your Honor, Detective Vick\'s own report says my client stood in that doorway and said "You\'re not coming in without a warrant," twice. Georgia v. Randolph is directly on point. A present, objecting co-tenant\'s refusal controls.',con:'Ms. Reyes is on the lease and signed a consent form. She had full authority over the shared space.',options:['Grant — suppress apartment evidence','Deny — consent was valid'],correct:0,why:'Georgia v. Randolph (2006): when a physically present co-occupant expressly refuses consent, a warrantless search cannot be justified by another occupant\'s consent. Hale objected at the door, twice.',excl:['srch']},
+  {id:'m2',by:'def',title:'Motion to suppress out-of-court identification',text:'The defense moves to suppress Mr. Albright\'s identification from a single-photo showup conducted by the case detective three days after the event.',pro:'A single photograph, shown by the lead detective, to a 74-year-old without his glasses who saw a hooded man at dusk from sixty feet. "That\'s probably him." This is the definition of unnecessarily suggestive and unreliable.',con:'Mr. Albright is a credible lifelong resident. Any weakness goes to weight, not admissibility. Let the factfinder decide.',options:['Grant — suppress the ID','Deny — admit the ID'],correct:0,why:'A single-photo showup with no exigency is unnecessarily suggestive (Manson v. Brathwaite), and the reliability factors are weak: dusk, 60 ft, no glasses, hood, 3-day delay, "probably," no confidence recorded.',excl:['id']}
+ ],
+ script:[
+  {who:'pros',t:'The State calls Dr. Nadia Fenn.'},
+  {call:'w3'},
+  {who:'clerk',t:'Raise your right hand. Do you swear to tell the truth, the whole truth and nothing but the truth?'},
+  {who:'w3',t:'I do.'},
+  {who:'pros',t:'Dr. Fenn, where was latent lift number three recovered?'},
+  {who:'w3',t:'From the interior sill of the pried rear kitchen window at 412 Elm. Interior side, meaning a hand on the inside of the house.'},
+  {who:'pros',t:'And your conclusion?'},
+  {who:'w3',t:'Identified to the right thumb of Marcus Hale. Sixteen corresponding minutiae, verified blind by a second examiner.'},
+  {who:'def',t:'Dr. Fenn, you can\'t tell the court when that print was left, can you?'},
+  {who:'w3',t:'Latent prints cannot be dated. Correct.'},
+  {who:'def',t:'Nothing further.'},
+  {back:'w3'},
+  {who:'pros',t:'The State calls Detective Sharon Vick.'},
+  {call:'w1'},
+  {who:'clerk',t:'Raise your right hand. Do you swear to tell the truth?'},
+  {who:'w1',t:'I do.'},
+  {who:'pros',t:'Detective, how did you connect the watch to the defendant?'},
+  {who:'w1',t:'The county pawn database. Gold Star Pawn, ticket GS-77013, September 6th: a Tag Heuer engraved "R.O. 1999," sold by Marcus Hale with his license and thumbprint. Mr. Ostrowski identified it as his.'},
+  {who:'pros',t:'And Mr. Ostrowski told you he had never met the defendant?'},
+  {obj:{by:'def',grounds:'Hearsay',q:'Mr. Ostrowski told you he had never met the defendant?',correct:'sustain',why:'The detective repeating what Mr. Ostrowski said, offered to prove he never met Hale, is classic hearsay. The State must call Mr. Ostrowski.'}},
+  {who:'pros',t:'Then the State will offer Mr. Ostrowski\'s stipulated affidavit, which the defense agreed to before trial. Nothing further for this witness.'},
+  {who:'def',t:'Detective, was my client\'s fingerprint on file before this case?'},
+  {who:'w1',t:'Yes. From his prior arrests.'},
+  {who:'def',t:'Nothing further.'},
+  {back:'w1'},
+  {who:'pros',t:'The State rests, with the stipulated affidavit that the Ostrowskis do not know the defendant and never invited him into their home.'}
+ ],
+ closing:[
+  {who:'pros',t:'His thumbprint is on the inside of a window that was pried open. The owners have never met him. Two days later he walked into a pawn shop with his own license and sold their engraved watch. That\'s burglary and grand theft.'},
+  {who:'def',t:'A print can\'t be dated. A pawned watch might have come from anyone on the street. The State has no witness who saw Marcus in that house. That\'s doubt.'}
+ ],
+ verdicts:[
+  {k:'g',label:'Guilty — burglary and grand theft',score:35},
+  {k:'gt',label:'Guilty of grand theft only',score:12},
+  {k:'ng',label:'Not guilty',score:0}
+ ],
+ verdictWhy:'Even after suppressing the apartment search and the showup ID, the independent evidence is strong: a verified thumbprint on the INTERIOR sill of the forced window, from a stranger to the home, plus a pawn ticket two days later for the engraved watch under his own ID. "Can\'t be dated" carries little weight when the owners never had him inside. Guilty on both counts.',
+ sentence:{kind:'felony',jailUnit:'months',jailMax:240,fineMax:10000,probMax:60,guide:{jail:[25,60],fine:[0,10000],prob:[0,36]},extras:[{k:'rest',label:'Restitution — laptop & jewelry recovered; watch $1,600 to Ostrowskis'},{k:'nc',label:'No contact with victims / 412 Elm'}],need:['rest'],note:'Lowest permissible: 25.2 months. Typical: 25–60 months prison, then probation, plus restitution.'}
+},
+/* ------------------------------------------------------------------ 6 */
+{
+ id:'varga',docket:'2026-CF-000412',tier:'Felony — Homicide',title:'State v. Elena Varga',
+ short:'Second-degree murder of her husband',
+ charges:[{code:'§ 782.04(2)',desc:'Murder in the second degree, with a firearm',cls:'Felony, 1st degree (PBL) — up to life in prison'}],
+ people:[
+  {...ADA_COLE,id:'pros',name:'Chief ADA Robert Lang',voice:'Zubenelgenubi',look:{skin:'#efcfb5',hair:'#9a9a9a',style:'short',suit:'#1a1d26',f:0,h:1.05},persona:'Chief homicide prosecutor, 25 years. Grave, deliberate, theatrical in closing. Believes the "tonight ends it" text proves premeditation. Fights hard to keep the interrogation statement in.'},
+  {...PD_FELD,id:'def',name:'Sandra Whitfield, Esq.',role:'Private defense counsel',voice:'Vindemiatrix',look:{skin:'#5c3b28',hair:'#151010',style:'bun',suit:'#2a2f3e',f:1},persona:'Renowned defense attorney specializing in battered-spouse cases. Calm, surgical, persuasive. Builds the self-defense case through documents.'},
+  {id:'dft',name:'Elena Varga',role:'Defendant',seat:'dft',voice:'Achernar',look:{skin:'#f2d6be',hair:'#3a2418',style:'long',suit:'#3b3b46',f:1},persona:'39-year-old middle-school music teacher. Quiet, haunted, still bruised. Married 11 years to Peter, who abused her. She shot him once when he was strangling her in the kitchen. She had packed a suitcase to leave that night. She is fragile; only answers if the judge or her lawyer addresses her.'},
+  {id:'w1',name:'Det. Luis Camacho',role:'Harlan PD, Homicide',seat:'gallery',voice:'Charon',look:{skin:'#b98058',hair:'#1a120c',style:'short',suit:'#2e3036',f:0},persona:'Homicide detective, convinced it was premeditated. Continued questioning after she asked for a lawyer and is defensive about it; he characterizes her words as "ambiguous."'},
+  {id:'w2',name:'Dr. Amit Rao',role:'Associate Medical Examiner',seat:'gallery',voice:'Iapetus',look:{skin:'#a8714c',hair:'#1c1410',style:'short',suit:'#33404a',f:0},persona:'Careful, neutral forensic pathologist. Explains range of fire from stippling, and that Elena\'s neck injuries (from the ER record he reviewed) are consistent with manual strangulation within hours.'},
+  {id:'w3',name:'Priya Shah',role:'Neighbor, 26 Larkin Way',seat:'gallery',voice:'Laomedeia',look:{skin:'#b07b56',hair:'#120c0a',style:'long',suit:'#5a3a5a',f:1},persona:'Next-door neighbor. Heard years of shouting, called 911 twice in 2024-25. That night heard crashing, a man yelling "You\'re not going anywhere," a choked scream, then one shot.'}
+ ],
+ truth:'May 17, 2026, 23:48, 24 Larkin Way. Elena packed a suitcase (found in her car trunk) and texted her sister Ana at 23:05: "I can\'t do this anymore. Tonight ends it." She meant leaving. Peter came home drunk (BAC 0.17 at autopsy), saw the suitcase, threw her against the fridge and strangled her. She grabbed the 9mm from the kitchen drawer (it was Peter\'s; normally kept in the drawer, NOT a safe) and shot him once in the chest at 2-3 ft. She called 911 immediately. ER: fingertip bruises and petechiae on her neck. At the station, at 03:12, she said "I think I need a lawyer." Det. Camacho kept talking and at 03:40 she said "I got the gun out of the drawer before he came home, I was scared." That statement is inadmissible under Edwards v. Arizona (questioning must stop after an unambiguous request for counsel; "I think I need a lawyer" in context was a clear request). Prior DV history: 911 calls 3/2024 and 11/2025; 2025 protective order petition withdrawn. Correct outcome: not guilty (State cannot disprove self-defense beyond a reasonable doubt).',
+ docs:[
+  {id:'911',title:'911 Call Transcript',kind:'Transcript',head:'HARLAN COUNTY E-911 — CALL TRANSCRIPT',fields:[['Call received','May 17, 2026, 23:49:31'],['Caller','Elena Varga, 24 Larkin Way'],['Duration','6 min 12 s']],body:[['Transcript','DISPATCH: 911, what is your emergency?\nCALLER: (gasping) I shot him. My husband. He— he was choking me, I couldn\'t breathe, I— please send someone.\nDISPATCH: Is he breathing, ma\'am?\nCALLER: I don\'t know. There\'s so much blood. Peter? Peter.\nDISPATCH: Is the weapon still in your hand?\nCALLER: I put it on the counter. I put it down. Please hurry.']]},
+  {id:'auto',title:'Autopsy Report — Peter Varga',kind:'Medical examiner',head:'OFFICE OF THE MEDICAL EXAMINER — DISTRICT 9',fields:[['Case','ME-26-0611'],['Decedent','Peter J. Varga, 44, 6\'1", 214 lb'],['Pathologist','Amit Rao, MD'],['Cause of death','Gunshot wound of chest'],['Manner','Homicide']],body:[['Findings','Single entrance wound, left chest, front-to-back, slightly downward. Stippling present over 9 cm radius, consistent with a range of approx. 2–3 feet. No soot (not contact). Fresh abrasions on right knuckles. Postmortem blood alcohol 0.17 g/dL.']]},
+  {id:'er',title:'ER Record — Elena Varga',kind:'Medical',head:'ST. BRIGID MEDICAL CENTER — EMERGENCY DEPT.',fields:[['Arrival','May 18, 01:05 (police escort)'],['Exam','Patterned fingertip contusions bilateral neck; petechial hemorrhages, both eyes; hoarse voice; contusion to back of head'],['Impression','Findings consistent with recent manual strangulation'],['Physician','Dr. K. Morrow']]},
+  {id:'scene',title:'Scene & Evidence Report',kind:'Police report',head:'HARLAN PD — HOMICIDE SCENE REPORT',fields:[['Location','24 Larkin Way, kitchen'],['Firearm','Taurus G3 9mm, registered to Peter J. Varga (2019)'],['Recovered','Kitchen counter, 1 spent casing'],['Kitchen','Refrigerator door dented at ~5 ft; magnets and photos on floor; chair overturned']],body:[['Vehicle','Elena\'s 2018 Subaru in driveway: packed suitcase, toiletry bag, her passport and her cello case in trunk.'],['Storage','Gun safe in garage found locked and EMPTY. Kitchen drawer left of stove contained a holster and a box of 9mm ammunition.']]},
+  {id:'txt',title:'Phone Extraction — Text Messages',kind:'Forensic extraction',head:'CELLEBRITE EXTRACTION — E. VARGA iPHONE',table:[['Time','From → To','Message'],['May 17, 22:51','Elena → Ana (sister)','he\'s at the bar again. I packed.'],['May 17, 22:58','Ana → Elena','Come here tonight. I\'ll leave the porch light on.'],['May 17, 23:05','Elena → Ana','I can\'t do this anymore. Tonight ends it.'],['May 17, 23:31','Ana → Elena','Are you on your way??'],['May 17, 23:52','Ana → Elena','Elena call me']]},
+  {id:'int',title:'Interview Transcript (excerpt)',kind:'Transcript',head:'HARLAN PD — RECORDED INTERVIEW, ROOM 2',fields:[['Subject','Elena Varga'],['Detective','Det. L. Camacho'],['Miranda','Read and waived 02:51']],body:[['03:12','VARGA: I think I need a lawyer. I don\'t— I need a lawyer.\nCAMACHO: Okay, okay. I just want to understand what happened. You don\'t have to say anything, I\'ll just tell you what I think.'],['03:40','CAMACHO: ...because the gun lives in the safe, right? Somebody had to go get it.\nVARGA: I got the gun out of the drawer before he came home. I was scared. I was so scared of him.']]},
+  {id:'dv',title:'Prior Incidents — 24 Larkin Way',kind:'Records',head:'HARLAN PD / CLERK OF COURT — PRIOR CONTACTS',table:[['Date','Event','Outcome'],['03/09/2024','911 call by neighbor P. Shah — shouting, woman screaming','Officers spoke to couple; Elena had red mark on cheek; no arrest'],['11/22/2025','911 call by Elena — "he pushed me down the stairs"','Peter arrested, battery DV; charges dropped when Elena declined to testify'],['12/01/2025','Petition for injunction for protection (Elena v. Peter)','Temporary injunction granted; petition voluntarily withdrawn 12/15/2025']]},
+  {id:'law',title:'Self-Defense & Edwards — Bench Notes',kind:'Law',head:'BENCH NOTES',body:[['Justifiable use of deadly force','Deadly force is justified if the defendant reasonably believed it necessary to prevent imminent death or great bodily harm. No duty to retreat in one\'s own home. Once raised, the State must disprove self-defense beyond a reasonable doubt. Evidence of the victim\'s prior violence toward the defendant is admissible to show the reasonableness of her fear.'],['Edwards v. Arizona (1981)','Once a suspect clearly invokes the right to counsel, all police-initiated interrogation must stop. Statements obtained through continued questioning are inadmissible in the State\'s case-in-chief.']]}
+ ],
+ motions:[
+  {id:'m1',by:'def',title:'Motion to suppress statements after 03:12',text:'The defense moves to suppress all statements after Ms. Varga said "I think I need a lawyer. I don\'t— I need a lawyer," including the 03:40 statement about the drawer.',pro:'She said "I need a lawyer." Twice. Detective Camacho said "okay" and kept going. That\'s Edwards. Everything after 03:12 is out.',con:'"I think I need a lawyer" is equivocal under Davis v. United States. The detective clarified, she kept talking. The statement is voluntary and admissible.',options:['Grant — suppress post-03:12 statements','Deny — statements admissible'],correct:0,why:'"I think I need a lawyer" might be equivocal alone, but she immediately followed with "I need a lawyer," which is unambiguous. Questioning had to stop under Edwards. Camacho\'s "I\'ll just tell you what I think" is the functional equivalent of interrogation.',excl:['int']},
+  {id:'m2',by:'def',title:'Motion to admit evidence of the decedent\'s prior violence',text:'The defense moves to admit the 2024 and 2025 police contacts and the 2025 injunction petition to show Ms. Varga\'s reasonable fear.',pro:'The question is what a reasonable person in Elena\'s shoes believed in that kitchen. Her shoes include being pushed down the stairs six months earlier.',con:'The State objects. Those charges were dropped, the injunction was withdrawn. This is an attempt to put the victim on trial.',options:['Grant — admit prior violence','Deny — exclude prior violence'],correct:0,why:'When self-defense is raised, the victim\'s specific prior acts of violence known to the defendant are admissible on the reasonableness of her fear. Dropped charges don\'t erase the events.',excl:[]}
+ ],
+ script:[
+  {who:'pros',t:'The State calls Dr. Amit Rao.'},
+  {call:'w2'},
+  {who:'clerk',t:'Raise your right hand. Do you swear to tell the truth, the whole truth and nothing but the truth?'},
+  {who:'w2',t:'I do.'},
+  {who:'pros',t:'Dr. Rao, how far was the muzzle from Mr. Varga\'s chest?'},
+  {who:'w2',t:'Stippling over a nine-centimeter radius, no soot. That places the muzzle roughly two to three feet away.'},
+  {who:'pros',t:'Not a struggle over the gun, then.'},
+  {who:'w2',t:'Not a contact wound. Two to three feet is consistent with arm\'s length.'},
+  {who:'pros',t:'Nothing further.'},
+  {who:'def',t:'Dr. Rao, you also reviewed Ms. Varga\'s ER record from that night?'},
+  {who:'w2',t:'I did. Patterned fingertip bruising on both sides of the neck and petechial hemorrhages in both eyes. That is consistent with manual strangulation within hours of the exam.'},
+  {who:'def',t:'And Mr. Varga\'s knuckles?'},
+  {who:'w2',t:'Fresh abrasions on the right knuckles. His blood alcohol was 0.17.'},
+  {who:'def',t:'Nothing further.'},
+  {back:'w2'},
+  {who:'pros',t:'The State calls Detective Luis Camacho.'},
+  {call:'w1'},
+  {who:'clerk',t:'Do you swear to tell the truth, the whole truth and nothing but the truth?'},
+  {who:'w1',t:'I do.'},
+  {who:'pros',t:'Detective, read the defendant\'s text at 11:05 PM.'},
+  {who:'w1',t:'To her sister: "I can\'t do this anymore. Tonight ends it." Forty-three minutes before she shot him.'},
+  {who:'pros',t:'And where was the gun normally kept?'},
+  {who:'w1',t:'There\'s a gun safe in the garage.'},
+  {who:'pros',t:'So in your opinion, she planned to kill him that night.'},
+  {obj:{by:'def',grounds:'Speculation / improper opinion on guilt',q:'In your opinion, she planned to kill him that night.',correct:'sustain',why:'A lay detective cannot opine on the defendant\'s state of mind or guilt. That is the factfinder\'s job. Speculation and improper opinion.'}},
+  {who:'pros',t:'Withdrawn. Nothing further.'},
+  {who:'def',t:'Detective, the safe in the garage was locked and empty, correct?'},
+  {who:'w1',t:'...Yes.'},
+  {who:'def',t:'And the kitchen drawer held a holster and a box of 9mm ammunition.'},
+  {who:'w1',t:'That\'s what the report says.'},
+  {who:'def',t:'And her car trunk held a packed suitcase, her passport and her cello.'},
+  {who:'w1',t:'Yes.'},
+  {who:'def',t:'Nothing further.'},
+  {back:'w1'},
+  {who:'pros',t:'The State rests.'},
+  {who:'def',t:'The defense calls Priya Shah.'},
+  {call:'w3'},
+  {who:'clerk',t:'Do you swear to tell the truth?'},
+  {who:'w3',t:'I do.'},
+  {who:'def',t:'Ms. Shah, what did you hear at about 11:45 that night?'},
+  {who:'w3',t:'Crashing, like something hitting the fridge. Peter yelling, "You\'re not going anywhere." Then a sound like... choking, a scream that cut off. Then one shot.'},
+  {who:'def',t:'Had you called 911 about that house before?'},
+  {who:'w3',t:'Twice. March 2024 and the time with the stairs.'},
+  {who:'pros',t:'Ms. Shah, through two walls, you can\'t be sure who was choking whom.'},
+  {who:'w3',t:'It was a woman\'s voice. It was Elena.'},
+  {back:'w3'},
+  {who:'def',t:'The defense rests.'}
+ ],
+ closing:[
+  {who:'pros',t:'"Tonight ends it." Forty-three minutes later, Peter Varga is dead with a bullet in his chest from three feet away. She had a car, a packed bag, and she could have left. She chose a gun. The State asks for a verdict of guilty of murder in the second degree.'},
+  {who:'def',t:'"Tonight ends it" was a woman leaving a marriage, with her passport and her cello in the trunk. He came home at 0.17, saw that suitcase, slammed her into a refrigerator, and put his hands around her throat. The marks on her neck, the petechiae in her eyes, the neighbor who heard her scream cut off. She had seconds. She had no duty to retreat in her own kitchen. The State cannot disprove self-defense, and the law requires a verdict of not guilty.'}
+ ],
+ verdicts:[
+  {k:'ng',label:'Not guilty — justifiable use of deadly force',score:35},
+  {k:'man',label:'Guilty of manslaughter (lesser)',score:10},
+  {k:'g',label:'Guilty of second-degree murder',score:0}
+ ],
+ verdictWhy:'With the post-invocation statement suppressed, the State\'s premeditation theory rests on an ambiguous text that the packed suitcase, passport and sister\'s "come here tonight" explain as leaving. The physical evidence (strangulation injuries, petechiae, dented fridge, 2–3 ft range at arm\'s length, his 0.17 BAC and knuckle abrasions) and the neighbor\'s account show imminent threat of death or great bodily harm in her own home. The State cannot disprove self-defense beyond a reasonable doubt.',
+ sentence:{kind:'felony',jailUnit:'months',jailMax:600,fineMax:15000,probMax:120,guide:{jail:[300,600],fine:[0,15000],prob:[0,0]},extras:[{k:'firearm',label:'Firearm minimum mandatory (25 yrs)'}],need:['firearm'],note:'If convicted of murder 2 with discharge of a firearm: 25-year minimum mandatory up to life.'}
+}
+];
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const GUILTY=new Set(['g','resp','lesser','gt','man','reck']);
+
+/* ===================================================== settings */
+const S={name:'Judge Hollis',key:'',model:'gemini-3.8-flash',tts:'gemini-3.8-flash-tts',ai:true,voice:true,gvoice:true,auto:true,vol:85,pace:1};
+try{Object.assign(S,JSON.parse(localStorage.getItem('court4b.set')||'{}'));}catch(e){}
+function saveS(){try{localStorage.setItem('court4b.set',JSON.stringify(S));}catch(e){}}
+const aiOn=()=>!!(S.ai&&S.key);
+function aiStat(err){const el=$('#aistat');if(err){el.textContent='AI error';el.className='err';el.title=err;return;}el.textContent=aiOn()?'Gemini on':'Scripted mode';el.className=aiOn()?'on':'';el.title='';}
+
+/* ===================================================== audio */
+let AC=null;
+function ctx(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();return AC;}
+function gavelSound(n){const c=ctx();if(!c)return;for(let i=0;i<(n||1);i++){const t=c.currentTime+0.02+i*0.28;
+ const o=c.createOscillator(),g=c.createGain();o.type='triangle';o.frequency.setValueAtTime(190,t);o.frequency.exponentialRampToValueAtTime(70,t+0.12);g.gain.setValueAtTime(0.9*S.vol/100,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.18);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+0.2);
+ const b=c.createBuffer(1,c.sampleRate*0.05,c.sampleRate),d=b.getChannelData(0);for(let j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*Math.pow(1-j/d.length,3);const ns=c.createBufferSource(),ng=c.createGain();ns.buffer=b;ng.gain.value=0.6*S.vol/100;ns.connect(ng);ng.connect(c.destination);ns.start(t);}}
+
+/* ===================================================== voice */
+const Voice={
+ cache:new Map(),fails:0,cur:null,
+ models(){return [...new Set([S.tts,'gemini-3.8-flash-tts','gemini-3.8-flash-lite-tts','gemini-2.5-flash-preview-tts'].filter(Boolean))];},
+ style(p){if(!p)return '';return `${p.role||''}, speaking in an American courtroom. ${(p.persona||'').split('.')[0]}.`;},
+ async gemini(text,p){
+  const ck=(p.voice||'Kore')+'|'+text;if(this.cache.has(ck))return this.cache.get(ck);
+  const c=ctx();if(!c)return null;const base='https://generativelanguage.googleapis.com/v1beta/';let last=null;
+  for(const m of this.models()){
+   try{let body,url;
+    if(/^gemini-3/.test(m)){const part={type:'text',text};const st=this.style(p);if(st)part.annotations=[{type:'speech_metadata',style:st}];url=base+'interactions';body={model:m,input:[{type:'user_input',content:[part]}],response_format:{type:'audio'},generation_config:{speech_config:[{voice:p.voice||'Kore'}]}};}
+    else{url=base+'models/'+m+':generateContent';body={contents:[{parts:[{text}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:p.voice||'Kore'}}}}};}
+    const j=await gpost(url,body,25000);const au=findAudio(j);
+    if(au){const buf=await decodePCM(au);this.cache.set(ck,buf);if(m!==S.tts){S.tts=m;saveS();}return buf;}
+    last=new Error('No audio returned');
+   }catch(e){last=e;if(/API key|401|403|PERMISSION|Failed to fetch|NetworkError/i.test(String(e.message)))break;}
+  }
+  throw last||new Error('TTS failed');
+ },
+ play(buf){return new Promise(res=>{const c=ctx();const s=c.createBufferSource(),g=c.createGain();g.gain.value=S.vol/100;s.buffer=buf;s.connect(g);g.connect(c.destination);s.onended=()=>{this.cur=null;res();};this.cur=s;s.start();});},
+ browser(text,p){return new Promise(res=>{
+  if(!('speechSynthesis' in window)){res(false);return;}
+  const u=new SpeechSynthesisUtterance(text);const vs=speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang));
+  const f=p&&p.look&&p.look.f;const pick=vs.filter(v=>f?/female|samantha|victoria|zira|karen|moira|tessa|fiona|susan|allison|ava|serena|aria|jenny/i.test(v.name):/male|daniel|alex|fred|david|mark|guy|tom|aaron|arthur|oliver|rishi/i.test(v.name));
+  const pool=pick.length?pick:vs;if(pool.length){const h=[...(p&&p.id||'x')].reduce((a,c)=>a+c.charCodeAt(0),0);u.voice=pool[h%pool.length];}
+  u.pitch=f?1.08:0.86;u.rate=1.02;u.volume=S.vol/100;let done=false;const fin=()=>{if(!done){done=true;res(true);}};
+  u.onend=fin;u.onerror=fin;setTimeout(fin,Math.max(3000,text.length*110));speechSynthesis.speak(u);}); },
+ async say(text,p){
+  if(!S.voice){await sleep(Math.max(1400,(900+text.length*48)*S.pace));return;}
+  if(S.gvoice&&S.key&&this.fails<3){try{const b=await this.gemini(text,p);if(b){this.fails=0;await this.play(b);await sleep(220);return;}}catch(e){this.fails++;console.warn('TTS',e);}}
+  const ok=await this.browser(text,p);if(!ok)await sleep(Math.max(1400,(900+text.length*48)*S.pace));await sleep(180);
+ },
+ stop(){try{this.cur&&this.cur.stop();}catch(e){}try{speechSynthesis.cancel();}catch(e){}}
+};
+async function gpost(url,body,ms){const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),ms||30000);
+ try{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':S.key},body:JSON.stringify(body),signal:ctl.signal});
+  if(!r.ok){let t='';try{t=(await r.text()).slice(0,300);}catch(_){}throw new Error('HTTP '+r.status+' '+t);}return await r.json();}finally{clearTimeout(to);}}
+function findAudio(o,d){d=d||0;if(!o||typeof o!=='object'||d>8)return null;if(typeof o.data==='string'&&o.data.length>1500)return{data:o.data,mime:o.mimeType||o.mime_type||''};for(const k in o){const r=findAudio(o[k],d+1);if(r)return r;}return null;}
+async function decodePCM(a){const bin=atob(a.data);const u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);const c=ctx();
+ if(bin.slice(0,4)==='RIFF')return await c.decodeAudioData(u8.buffer.slice(0));const m=/rate=(\d+)/.exec(a.mime||'');const rate=m?+m[1]:24000;const n=Math.floor(u8.length/2);const buf=c.createBuffer(1,n,rate);const ch=buf.getChannelData(0);const dv=new DataView(u8.buffer);for(let i=0;i<n;i++)ch[i]=dv.getInt16(i*2,true)/32768;return buf;}
+
+/* ===================================================== text AI */
+async function aiText(prompt){
+ const ms=[...new Set([S.model,'gemini-3.8-flash','gemini-3-flash','gemini-flash-latest','gemini-2.5-flash'].filter(Boolean))];let last=null;
+ for(const m of ms){
+  try{const j=await gpost('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.85,responseMimeType:'application/json'}},40000);
+   const t=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[]).map(p=>p.text||'').join('');
+   if(t){if(m!==S.model){S.model=m;saveS();}aiStat();return t;}last=new Error('Empty reply');
+  }catch(e){last=e;if(/API key|401|403|PERMISSION/i.test(String(e.message)))break;}
+ }
+ aiStat(String(last&&last.message||last));throw last;
+}
+function parseJSON(t){try{return JSON.parse(t);}catch(e){const m=t.match(/\{[\s\S]*\}/);if(m){try{return JSON.parse(m[0]);}catch(_){}}}return null;}
+
+/* ===================================================== 3D */
+let R=null,scene,cam,clock;
+const W={people:{},labels:{},look:{yaw:0,pitch:-0.12},follow:true,focus:null,tgt:null};
+const SEAT={
+ clerk:{p:[-2.75,0,-6.6],r:0.25,sit:1},bailiff:{p:[5.7,0,-4.6],r:-2.3},
+ stand:{p:[3.25,0.42,-5.6],r:-2.35,sit:1},
+ pros:{p:[-2.3,0,-1.1],r:Math.PI,sit:1},pros2:{p:[-3.4,0,-1.1],r:Math.PI,sit:1},
+ def:{p:[2.0,0,-1.1],r:Math.PI,sit:1},dft:{p:[3.2,0,-1.1],r:Math.PI,sit:1},
+};
+const GAL=[[-4.6,2.7],[-3.3,2.7],[-1.9,2.7],[1.9,2.7],[3.3,2.7],[4.6,2.7],[-4.2,4.3],[-2.6,4.3],[2.4,4.3],[4.0,4.3]];
+function initGL(){
+ const cv=$('#gl');try{R=new THREE.WebGLRenderer({canvas:cv,antialias:true});}catch(e){R=null;}
+ if(!R||!R.getContext()){$('#stage').classList.add('nogl');R=null;return;}
+ R.setPixelRatio(Math.min(2,devicePixelRatio||1));R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;R.outputEncoding=THREE.sRGBEncoding;
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x1a1410);scene.fog=new THREE.Fog(0x1a1410,16,34);
+ cam=new THREE.PerspectiveCamera(58,1,0.05,80);cam.position.set(0,2.95,-8.95);
+ clock=new THREE.Clock();
+ buildRoom();
+ const ro=new ResizeObserver(resize);ro.observe($('#stage'));resize();
+ // drag to look
+ let drag=null;cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw:W.look.yaw,pitch:W.look.pitch};cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
+ cv.addEventListener('pointermove',e=>{if(!drag)return;W.look.yaw=Math.max(-1.25,Math.min(1.25,drag.yaw-(e.clientX-drag.x)*0.004));W.look.pitch=Math.max(-0.7,Math.min(0.35,drag.pitch-(e.clientY-drag.y)*0.004));W.manual=performance.now();});
+ const up=()=>{drag=null;cv.style.cursor='grab';};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+ cv.addEventListener('wheel',e=>{e.preventDefault();cam.fov=Math.max(30,Math.min(70,cam.fov+e.deltaY*0.03));cam.updateProjectionMatrix();},{passive:false});
+ requestAnimationFrame(loop);
+}
+function resize(){if(!R)return;const el=$('#stage');const w=el.clientWidth,h=el.clientHeight;R.setSize(w,h,false);cam.aspect=w/Math.max(1,h);cam.updateProjectionMatrix();}
+function M(c,o){return new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:0.75,metalness:0},o||{}));}
+function box(w,h,d,mat,x,y,z,par){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;(par||scene).add(m);return m;}
+function canvasTex(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return t;}
+function woodTex(base,dark,planks){return canvasTex(512,512,(g,w,h)=>{g.fillStyle=base;g.fillRect(0,0,w,h);for(let i=0;i<planks;i++){const y=i*h/planks;g.fillStyle=i%2?'rgba(0,0,0,.06)':'rgba(255,255,255,.03)';g.fillRect(0,y,w,h/planks);g.fillStyle=dark;g.fillRect(0,y,w,1.5);}
+ for(let i=0;i<500;i++){g.strokeStyle=`rgba(0,0,0,${Math.random()*0.08})`;g.beginPath();const y=Math.random()*h;g.moveTo(0,y);g.bezierCurveTo(w*0.3,y+rnd(-6,6),w*0.6,y+rnd(-6,6),w,y+rnd(-4,4));g.stroke();}});}
+function buildRoom(){
+ const wood=M(0x5a3a22,{map:woodTex('#5f3d24','#2a1a0e',6),roughness:0.55});
+ const woodD=M(0x3e2716,{map:woodTex('#43291a','#1d1209',8),roughness:0.5});
+ const panel=M(0x6b4528,{map:woodTex('#6e4729','#3a2414',3),roughness:0.6});
+ const plaster=M(0xd8ccb4,{roughness:0.95});
+ const carpet=M(0x5a1f22,{map:canvasTex(256,256,(g,w,h)=>{g.fillStyle='#5b2023';g.fillRect(0,0,w,h);for(let i=0;i<3000;i++){g.fillStyle=`rgba(${Math.random()<.5?0:255},0,0,${Math.random()*0.06})`;g.fillRect(Math.random()*w,Math.random()*h,2,2);}g.strokeStyle='rgba(212,170,90,.18)';g.lineWidth=2;for(let x=0;x<w;x+=32)for(let y=0;y<h;y+=32){g.beginPath();g.moveTo(x+16,y+6);g.lineTo(x+26,y+16);g.lineTo(x+16,y+26);g.lineTo(x+6,y+16);g.closePath();g.stroke();}}),roughness:1});
+ carpet.map.wrapS=carpet.map.wrapT=THREE.RepeatWrapping;carpet.map.repeat.set(6,7);
+ const brass=M(0xc9a24a,{metalness:0.8,roughness:0.3});
+ const leather=M(0x2a1b14,{roughness:0.45});
+ const green=M(0x24382c,{roughness:0.8});
+ // floor, walls, ceiling
+ const fl=new THREE.Mesh(new THREE.PlaneGeometry(18,22),carpet);fl.rotation.x=-Math.PI/2;fl.receiveShadow=true;scene.add(fl);
+ const W2=9,D2=11,H=6.2;
+ [[0,-D2,0],[0,D2,Math.PI],[-W2,0,Math.PI/2],[W2,0,-Math.PI/2]].forEach(([x,z,r],i)=>{
+  const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=r;scene.add(g);const len=i<2?18:22;
+  box(len,2.6,0.08,panel,0,1.3,0,g);box(len,0.12,0.16,woodD,0,2.62,0.04,g);box(len,0.18,0.1,woodD,0,0.09,0.06,g);
+  for(let k=-len/2+1.2;k<len/2;k+=2.4)box(0.1,2.5,0.14,woodD,k,1.28,0.05,g);
+  box(len,H-2.68,0.06,plaster,0,2.68+(H-2.68)/2,-0.02,g);
+  box(len,0.3,0.25,woodD,0,H-0.15,0.1,g);
+ });
+ const ceil=new THREE.Mesh(new THREE.PlaneGeometry(18,22),M(0xcfc3a9,{roughness:1}));ceil.rotation.x=Math.PI/2;ceil.position.y=H;scene.add(ceil);
+ for(let x=-6;x<=6;x+=4)for(let z=-8;z<=8;z+=4)box(3.6,0.08,3.6,M(0xbfb296),x,H-0.05,z);
+ // windows on right wall (light panels)
+ const win=M(0xfff2cf,{emissive:0xffe6b0,emissiveIntensity:0.55,roughness:1});
+ for(let z=-4;z<=8;z+=4){box(0.05,2.2,1.4,win,8.94,4.1,z);box(0.07,2.3,0.08,woodD,8.92,4.1,z);box(0.07,0.08,1.5,woodD,8.92,4.1,z);}
+ // judge platform + bench
+ box(7.6,0.5,3.2,woodD,0,0.25,-9.4);
+ const bench=box(6.4,1.1,1.0,wood,0,1.05,-7.9);box(6.7,0.08,1.25,woodD,0,1.64,-7.95);
+ for(let x=-2.6;x<=2.6;x+=1.3)box(1.0,0.75,0.04,panel,x,1.05,-7.38);
+ box(0.9,0.02,0.6,M(0x2b3b2f),0.2,1.69,-8.1);// blotter
+ const nameplate=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.14,0.04),M(0xffffff,{map:canvasTex(512,80,(g,w,h)=>{g.fillStyle='#b8933d';g.fillRect(0,0,w,h);g.fillStyle='#1f1505';g.font='700 40px Georgia';g.textAlign='center';g.textBaseline='middle';g.fillText((S.name||'Judge').toUpperCase(),w/2,h/2+2);}),metalness:0.6,roughness:0.35}));nameplate.position.set(0,1.75,-7.42);scene.add(nameplate);W.nameplate=nameplate;
+ // gavel on bench
+ const gv=new THREE.Group();gv.position.set(0.85,1.72,-7.7);scene.add(gv);box(0.07,0.07,0.2,woodD,0,0.02,0,gv);box(0.025,0.025,0.26,woodD,0,0.02,0.15,gv);gv.rotation.y=0.6;W.gavel=gv;
+ const blk=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.03,20),woodD);blk.position.set(0.95,1.70,-7.55);scene.add(blk);
+ // wall behind bench: seal + flags + dais panel
+ box(5.4,3.2,0.12,woodD,0,2.1,-10.9);
+ const seal=new THREE.Mesh(new THREE.CircleGeometry(0.9,48),M(0xffffff,{map:canvasTex(512,512,drawSeal),roughness:0.5,metalness:0.2}));seal.position.set(0,3.95,-10.82);scene.add(seal);
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(0.92,0.05,10,48),brass);ring.position.copy(seal.position);scene.add(ring);
+ const lettering=new THREE.Mesh(new THREE.PlaneGeometry(5,0.36),M(0xffffff,{map:canvasTex(1024,72,(g,w,h)=>{g.clearRect(0,0,w,h);g.fillStyle='#d9b45a';g.font='600 40px Georgia';g.textAlign='center';g.textBaseline='middle';g.fillText('IN GOD WE TRUST',w/2,h/2);}),transparent:true}));lettering.position.set(0,5.3,-10.88);scene.add(lettering);
+ flag(-2.3,-10.4,usFlag());flag(2.3,-10.4,stateFlag());
+ // clerk desk
+ box(1.8,0.95,0.7,wood,-2.75,0.48,-5.95);box(1.95,0.06,0.85,woodD,-2.75,0.98,-5.95);
+ monitor(-2.75,1.0,-6.15);
+ // witness stand
+ box(1.6,0.42,1.6,woodD,3.25,0.21,-5.6);
+ const ws=new THREE.Group();ws.position.set(3.25,0.42,-5.6);scene.add(ws);
+ box(1.5,0.95,0.06,wood,0,0.47,0.72,ws);box(0.06,0.95,1.4,wood,-0.72,0.47,0,ws);box(1.6,0.06,0.18,woodD,0,0.97,0.72,ws);box(0.18,0.06,1.4,woodD,-0.72,0.97,0,ws);
+ ws.rotation.y=-0.78;
+ mic(3.0,1.42,-5.15);
+ chair(3.25,0.42,-5.6,-2.35,leather);
+ // counsel tables
+ [[-2.85,-1.85],[2.6,-1.85]].forEach(([x,z])=>{box(2.6,0.06,1.0,wood,x,0.78,z);[-1.2,1.2].forEach(dx=>[-0.42,0.42].forEach(dz=>box(0.07,0.76,0.07,woodD,x+dx,0.38,z+dz)));box(2.5,0.5,0.04,panel,x,0.5,z-0.47);
+  paper(x+rnd(-.8,.8),0.82,z+rnd(-.2,.2));paper(x+rnd(-.8,.8),0.82,z+rnd(-.2,.2));box(0.36,0.12,0.26,M(0x3a2a1c),x-0.7,0.87,z+0.25);
+  const jug=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.07,0.24,14),M(0xbfd8e6,{transparent:true,opacity:0.5,roughness:0.1}));jug.position.set(x+0.9,0.93,z-0.2);scene.add(jug);});
+ [-3.4,-2.3,2.0,3.2].forEach(x=>chair(x,0,-1.1,Math.PI,leather));
+ // lectern
+ box(0.6,1.1,0.45,wood,0,0.55,-2.6);box(0.7,0.05,0.55,woodD,0,1.13,-2.62).rotation.x=0.18;
+ // bar rail
+ for(let x=-8.6;x<=8.6;x+=0.22){if(Math.abs(x)<0.6)continue;const b=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.85,8),woodD);b.position.set(x,0.43,1.25);scene.add(b);}
+ box(7.9,0.08,0.16,wood,-4.7,0.88,1.25);box(7.9,0.08,0.16,wood,4.7,0.88,1.25);box(7.9,0.08,0.12,woodD,-4.7,0.04,1.25);box(7.9,0.08,0.12,woodD,4.7,0.04,1.25);
+ // gate
+ box(1.1,0.75,0.05,wood,0,0.48,1.25);
+ // gallery benches
+ for(let z=2.6;z<=9;z+=1.6)[-4.6,4.6].forEach(x=>{box(6.6,0.08,0.55,wood,x,0.46,z+0.15);box(6.6,0.6,0.07,wood,x,0.82,z+0.45);box(6.6,0.42,0.05,woodD,x,0.21,z+0.4);[-3.2,3.2].forEach(dx=>box(0.08,0.9,0.62,woodD,x+dx,0.45,z+0.18));});
+ // jury box (left) — empty: bench trials today
+ box(0.08,1.0,4.6,wood,-5.8,0.5,-3.4);box(3.0,0.25,4.8,woodD,-7.3,0.12,-3.4);box(2.0,0.25,4.8,woodD,-7.8,0.37,-3.4);
+ for(let z=-5.3;z<=-1.5;z+=0.75){chair(-6.6,0.25,z,Math.PI/2,green);chair(-7.6,0.5,z,Math.PI/2,green);}
+ // exit sign & clock
+ const clk=new THREE.Mesh(new THREE.CircleGeometry(0.32,32),M(0xffffff,{map:canvasTex(256,256,(g,w)=>{g.fillStyle='#f3ead6';g.beginPath();g.arc(w/2,w/2,w/2,0,7);g.fill();g.strokeStyle='#222';g.lineWidth=10;g.stroke();g.lineWidth=4;for(let i=0;i<12;i++){const a=i/12*Math.PI*2;g.beginPath();g.moveTo(w/2+Math.cos(a)*100,w/2+Math.sin(a)*100);g.lineTo(w/2+Math.cos(a)*115,w/2+Math.sin(a)*115);g.stroke();}g.lineWidth=7;g.beginPath();g.moveTo(128,128);g.lineTo(128,60);g.stroke();g.beginPath();g.moveTo(128,128);g.lineTo(180,140);g.stroke();})}));
+ clk.position.set(0,4.4,10.94);clk.rotation.y=Math.PI;scene.add(clk);
+ const exit=new THREE.Mesh(new THREE.PlaneGeometry(0.6,0.22),M(0xffffff,{map:canvasTex(256,96,(g,w,h)=>{g.fillStyle='#200';g.fillRect(0,0,w,h);g.fillStyle='#ff3b2f';g.font='700 62px Arial';g.textAlign='center';g.textBaseline='middle';g.fillText('EXIT',w/2,h/2+3);}),emissive:0x441111}));exit.position.set(-6,2.9,10.94);exit.rotation.y=Math.PI;scene.add(exit);
+ box(1.4,2.4,0.1,woodD,-6,1.2,10.95);box(1.4,2.4,0.1,woodD,6,1.2,10.95);
+ // lights
+ scene.add(new THREE.HemisphereLight(0xfff0d8,0x2a1a10,0.55));
+ const sun=new THREE.DirectionalLight(0xffe0b0,0.65);sun.position.set(8,9,2);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-12,right:12,top:12,bottom:-12,near:1,far:30});scene.add(sun);
+ for(let x=-4;x<=4;x+=4)for(let z=-6;z<=6;z+=6){const pl=new THREE.PointLight(0xffd9a0,0.38,14,1.6);pl.position.set(x,5.4,z);scene.add(pl);
+  const sh=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.4,0.3,20,1,true),M(0xe8d9b5,{emissive:0xffd9a0,emissiveIntensity:0.9,side:THREE.DoubleSide}));sh.position.set(x,5.55,z);scene.add(sh);
+  const rod=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.6,6),brass);rod.position.set(x,5.9,z);scene.add(rod);}
+ const benchLight=new THREE.SpotLight(0xffe8c0,0.6,12,0.7,0.6);benchLight.position.set(0,5.5,-5);benchLight.target.position.set(0,1,-9);scene.add(benchLight,benchLight.target);
+ // spectators
+ W.spect=[];
+ const looks=[{skin:'#e8c2a0',hair:'#3a2a1a',style:'short',suit:'#58606b'},{skin:'#8a5a3a',hair:'#1a1210',style:'long',suit:'#7a5040',f:1},{skin:'#f1d0b5',hair:'#c0a070',style:'bob',suit:'#3b5068',f:1},{skin:'#c99670',hair:'#222',style:'bald',suit:'#4a4a40'},{skin:'#6a4430',hair:'#0e0a08',style:'curly',suit:'#2f4a3a'},{skin:'#efd2bb',hair:'#7a5a40',style:'bun',suit:'#6a3a4a',f:1}];
+ [[-5.8,6],[ -3.0,6],[4.2,6],[5.6,7.6],[-4.6,7.6],[2.2,9.2],[-2.2,9.2]].forEach(([x,z],i)=>{const p=makePerson(looks[i%looks.length]);p.g.position.set(x,0,z-0.05);p.g.rotation.y=Math.PI;setSit(p,1,true);scene.add(p.g);W.spect.push(p);});
+}
+function drawSeal(g,w,h){g.fillStyle='#24406e';g.beginPath();g.arc(w/2,h/2,w/2,0,7);g.fill();g.strokeStyle='#d9b45a';g.lineWidth=10;g.beginPath();g.arc(w/2,h/2,w/2-30,0,7);g.stroke();g.lineWidth=3;g.beginPath();g.arc(w/2,h/2,w/2-80,0,7);g.stroke();
+ g.fillStyle='#e8cf8a';g.font='700 34px Georgia';g.textAlign='center';g.textBaseline='middle';const txt='• HARLAN COUNTY • CIRCUIT COURT • THIRTEENTH JUDICIAL CIRCUIT ';for(let i=0;i<txt.length;i++){const a=-Math.PI/2+i/txt.length*Math.PI*2;g.save();g.translate(w/2+Math.cos(a)*(w/2-55),h/2+Math.sin(a)*(w/2-55));g.rotate(a+Math.PI/2);g.fillText(txt[i],0,0);g.restore();}
+ // scales of justice
+ g.strokeStyle='#e8cf8a';g.lineWidth=7;g.beginPath();g.moveTo(w/2,170);g.lineTo(w/2,345);g.moveTo(170,205);g.lineTo(342,205);g.moveTo(205,355);g.lineTo(307,355);g.stroke();
+ [[180,205],[332,205]].forEach(([x,y])=>{g.beginPath();g.moveTo(x,y);g.lineTo(x-28,y+62);g.moveTo(x,y);g.lineTo(x+28,y+62);g.stroke();g.beginPath();g.arc(x,y+62,30,0,Math.PI);g.fill();});
+ g.beginPath();g.arc(w/2,160,13,0,7);g.fill();g.font='italic 600 26px Georgia';g.fillText('1857',w/2,400);}
+function usFlag(){return canvasTex(390,205,(g,w,h)=>{for(let i=0;i<13;i++){g.fillStyle=i%2?'#f4f0e6':'#a3202a';g.fillRect(0,i*h/13,w,h/13+1);}g.fillStyle='#2a3a6a';g.fillRect(0,0,w*0.4,h*7/13);g.fillStyle='#f4f0e6';for(let r=0;r<9;r++)for(let c=0;c<(r%2?5:6);c++){g.beginPath();g.arc(12+c*26+(r%2?13:0),10+r*11.5,3.2,0,7);g.fill();}});}
+function stateFlag(){return canvasTex(390,260,(g,w,h)=>{g.fillStyle='#24406e';g.fillRect(0,0,w,h);g.fillStyle='#d9b45a';g.beginPath();g.arc(w/2,h/2,62,0,7);g.fill();g.fillStyle='#24406e';g.font='700 26px Georgia';g.textAlign='center';g.textBaseline='middle';g.fillText('HARLAN',w/2,h/2);g.fillStyle='#d9b45a';g.font='700 22px Georgia';g.fillText('JUSTITIA ET CONCORDIA',w/2,h-26);});}
+function flag(x,z,tex){const brass=M(0xc9a24a,{metalness:0.8,roughness:0.3});const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,3.6,8),brass);pole.position.set(x,2.3,z);scene.add(pole);
+ const top=new THREE.Mesh(new THREE.ConeGeometry(0.06,0.18,10),brass);top.position.set(x,4.2,z);scene.add(top);const base=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.24,0.12,14),brass);base.position.set(x,0.56,z);scene.add(base);
+ const geo=new THREE.PlaneGeometry(0.9,1.5,10,10);const pos=geo.attributes.position;for(let i=0;i<pos.count;i++){const px=pos.getX(i),py=pos.getY(i);pos.setZ(i,Math.sin(py*4)*0.05*(1-(px+0.45)/0.9)+Math.sin(px*6)*0.03);}geo.computeVertexNormals();
+ const m=new THREE.Mesh(geo,M(0xffffff,{map:tex,side:THREE.DoubleSide,roughness:0.9}));m.rotation.z=-Math.PI/2;m.position.set(x+(x<0?0.48:-0.48)*0+(x<0?0.03:-0.03),3.5,z+0.02);m.rotation.y=x<0?0.25:-0.25;m.position.x+=x<0?0.48:-0.48;m.castShadow=true;scene.add(m);}
+function monitor(x,y,z){box(0.5,0.32,0.03,M(0x111111),x,y+0.3,z);box(0.06,0.18,0.06,M(0x222222),x,y+0.09,z);box(0.42,0.24,0.01,M(0x223344,{emissive:0x335577,emissiveIntensity:0.6}),x,y+0.3,z+0.02);}
+function mic(x,y,z){const mm=M(0x111111,{metalness:0.6,roughness:0.4});const s=new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.4,6),mm);s.position.set(x,y,z);s.rotation.x=0.5;scene.add(s);const h=new THREE.Mesh(new THREE.SphereGeometry(0.035,10,8),mm);h.position.set(x,y+0.17,z+0.1);scene.add(h);}
+function chair(x,y,z,r,mat){const g=new THREE.Group();g.position.set(x,y,z);g.rotation.y=r;scene.add(g);box(0.5,0.1,0.5,mat,0,0.47,0,g);box(0.5,0.62,0.08,mat,0,0.85,-0.22,g);box(0.06,0.42,0.06,M(0x222222,{metalness:0.6}),0,0.22,0,g);}
+function paper(x,y,z){const p=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.005,0.3),M(0xf2ead6));p.position.set(x,y,z);p.rotation.y=rnd(-.4,.4);scene.add(p);}
+
+/* ---------------- people */
+function makePerson(L){
+ L=L||{};const g=new THREE.Group();const h=L.h||(L.f?0.95:1);
+ const skin=M(L.skin||'#e0b090',{roughness:0.6}),hairM=M(L.hair||'#2a1a10',{roughness:0.85}),suit=M(L.suit||'#333',{roughness:0.7}),pants=M(new THREE.Color(L.suit||'#333').multiplyScalar(0.7),{roughness:0.75}),shirt=M(L.uni?'#c8cfd8':'#f1eee6');
+ const body=new THREE.Group();body.scale.setScalar(h);g.add(body);
+ const legs=new THREE.Group();body.add(legs);
+ const lL=box(0.15,0.84,0.17,pants,-0.1,0.42,0,legs),lR=box(0.15,0.84,0.17,pants,0.1,0.42,0,legs);
+ box(0.17,0.08,0.26,M(0x161210),-0.1,0.04,0.04,legs);box(0.17,0.08,0.26,M(0x161210),0.1,0.04,0.04,legs);
+ const up=new THREE.Group();up.position.y=0.84;body.add(up);
+ const torso=new THREE.Mesh(new THREE.CylinderGeometry(L.f?0.2:0.23,L.f?0.19:0.2,0.62,14),suit);torso.position.y=0.32;torso.scale.z=0.62;torso.castShadow=true;up.add(torso);
+ box(0.12,0.3,0.02,shirt,0,0.47,0.13,up);if(!L.f&&!L.uni)box(0.045,0.26,0.02,M(['#7a1f24','#24406e','#3b4a2a','#5a3a6a'][Math.floor(Math.random()*4)]),0,0.44,0.142,up);
+ if(L.uni){box(0.06,0.07,0.02,M(0xd9b45a,{metalness:0.8,roughness:0.3}),-0.11,0.5,0.13,up);box(0.48,0.06,0.3,M(0x1a1a1a),0,0.03,0,up);}
+ const arms=[];[-1,1].forEach(s=>{const a=new THREE.Group();a.position.set(s*(L.f?0.25:0.28),0.58,0);up.add(a);box(0.12,0.56,0.14,suit,0,-0.27,0,a);const hd=new THREE.Mesh(new THREE.SphereGeometry(0.055,10,8),skin);hd.position.y=-0.58;a.add(hd);a.rotation.z=s*0.06;arms.push(a);});
+ const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.06,0.1,10),skin);neck.position.y=0.66;up.add(neck);
+ const head=new THREE.Group();head.position.y=0.8;up.add(head);
+ const sk=new THREE.Mesh(new THREE.SphereGeometry(0.13,20,16),skin);sk.scale.set(0.92,1.08,0.98);sk.castShadow=true;head.add(sk);
+ [-1,1].forEach(s=>{const e=new THREE.Mesh(new THREE.SphereGeometry(0.016,8,6),M(0x14100c));e.position.set(s*0.045,0.025,0.118);head.add(e);const br=box(0.05,0.012,0.012,hairM,s*0.047,0.06,0.12,head);br.castShadow=false;const ear=new THREE.Mesh(new THREE.SphereGeometry(0.03,8,6),skin);ear.position.set(s*0.122,0,0);ear.scale.set(0.5,1,0.8);head.add(ear);});
+ const nose=new THREE.Mesh(new THREE.ConeGeometry(0.018,0.05,6),skin);nose.position.set(0,-0.005,0.13);nose.rotation.x=Math.PI/2;head.add(nose);
+ const mouth=box(0.05,0.012,0.01,M(0x5a2a22),0,-0.055,0.122,head);mouth.castShadow=false;
+ const st=L.style||'short';
+ if(st!=='bald'){const cap=new THREE.Mesh(new THREE.SphereGeometry(0.138,20,12,0,Math.PI*2,0,Math.PI*0.52),hairM);cap.position.y=0.018;cap.scale.set(0.95,1.08,1.02);cap.rotation.x=-0.18;head.add(cap);}
+ else{const fr=new THREE.Mesh(new THREE.TorusGeometry(0.115,0.025,6,20,Math.PI*1.2),hairM);fr.rotation.set(Math.PI/2,0,Math.PI*-0.1+Math.PI);fr.position.set(0,-0.01,-0.01);head.add(fr);}
+ if(st==='long'){box(0.27,0.34,0.08,hairM,0,-0.12,-0.08,head);}
+ if(st==='bob'){box(0.29,0.16,0.24,hairM,0,-0.04,-0.03,head);}
+ if(st==='bun'){const b=new THREE.Mesh(new THREE.SphereGeometry(0.06,10,8),hairM);b.position.set(0,0.05,-0.14);head.add(b);}
+ if(st==='curly'){for(let i=0;i<9;i++){const b=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,6),hairM);const a=i/9*Math.PI*2;b.position.set(Math.cos(a)*0.1,0.08+Math.sin(i)*0.02,Math.sin(a)*0.09-0.01);head.add(b);}}
+ return {g,body,legs,up,head,mouth,arms,h,talk:0,sit:0,sitT:0,ph:Math.random()*10,target:null,lookAt:null,face:0};
+}
+function setSit(p,on,instant){p.sitT=on?1:0;if(instant)p.sit=p.sitT;}
+function seatPerson(p,seat,instant){const s=SEAT[seat];if(!s)return;const pos=new THREE.Vector3(...s.p);p.home={pos,r:s.r,sit:!!s.sit};if(instant){p.g.position.copy(pos);p.g.rotation.y=s.r;setSit(p,s.sit,true);}else walkTo(p,pos,s.r,!!s.sit);}
+function walkTo(p,pos,r,sit){setSit(p,0);p.path=route(p.g.position.clone(),pos);p.endR=r;p.endSit=sit;return new Promise(res=>{p.onArrive=res;});}
+function route(a,b){const V=(x,z)=>new THREE.Vector3(x,0,z);const pts=[];const ins=v=>v.z<1.25;
+ if(a.y>0.1)pts.push(V(2.35,-4.7),V(0.9,-3.0));else if(ins(a)&&a.z<0.5)pts.push(V(a.x<0?-0.9:0.9,a.z+0.25));
+ if(ins(a)&&!ins(b))pts.push(V(0,0.6),V(0,1.25),V(0,1.9),V(b.x,2.0));
+ if(!ins(a)&&ins(b)){pts.unshift(V(a.x,2.0),V(0,1.9),V(0,1.25),V(0,0.6));}
+ if(b.y>0.1)pts.push(V(0.9,-3.0),V(2.35,-4.7));else if(ins(b)&&b.z<0.5)pts.push(V(b.x<0?-0.9:0.9,b.z+0.25));
+ pts.push(b.clone());return pts;}
+function updatePerson(p,dt,t){
+ if(p.path&&p.path.length){const tg=p.path[0];const pos=p.g.position;const d=new THREE.Vector3(tg.x-pos.x,0,tg.z-pos.z);const dist=d.length();
+  const step=1.25*dt;pos.y+= (tg.y-pos.y)*Math.min(1,dt*6);
+  if(dist<=step){pos.x=tg.x;pos.z=tg.z;p.path.shift();if(!p.path.length){p.g.position.y=tg.y;p.walking=false;if(p.endR!=null)p.face=p.endR;setSit(p,p.endSit);p.onArrive&&p.onArrive();p.onArrive=null;}}
+  else{d.normalize();pos.x+=d.x*step;pos.z+=d.z*step;p.face=Math.atan2(d.x,d.z);p.walking=true;}}
+ // turn
+ let dr=p.face-p.g.rotation.y;dr=Math.atan2(Math.sin(dr),Math.cos(dr));p.g.rotation.y+=dr*Math.min(1,dt*6);
+ // sit
+ p.sit+=(p.sitT-p.sit)*Math.min(1,dt*5);const sitDrop=0.4*p.sit;p.body.position.y=-sitDrop*p.h;p.legs.visible=p.sit<0.6;
+ // walk anim
+ const w=p.walking?Math.sin(t*8+p.ph):0;p.legs.children[0].rotation.x=w*0.5;p.legs.children[1].rotation.x=-w*0.5;p.arms[0].rotation.x=-w*0.4;p.arms[1].rotation.x=w*0.4;
+ // breathing + talk
+ p.up.scale.y=1+Math.sin(t*1.6+p.ph)*0.006;
+ if(p.talk>0){p.mouth.scale.y=1+Math.abs(Math.sin(t*17+p.ph))*3.4+Math.abs(Math.sin(t*9.3))*1.5;p.arms[1].rotation.x=-0.35+Math.sin(t*2.3+p.ph)*0.25;p.arms[1].rotation.z=0.15;}
+ else{p.mouth.scale.y+= (1-p.mouth.scale.y)*Math.min(1,dt*10);if(!p.walking){p.arms[1].rotation.x*=0.9;p.arms[1].rotation.z=0.06;}}
+ // head look
+ let hy=Math.sin(t*0.4+p.ph)*0.12;if(p.lookAt){const wp=new THREE.Vector3();p.g.getWorldPosition(wp);const a=Math.atan2(p.lookAt.x-wp.x,p.lookAt.z-wp.z)-p.g.rotation.y;hy=Math.max(-1.1,Math.min(1.1,Math.atan2(Math.sin(a),Math.cos(a))));}
+ p.head.rotation.y+=(hy-p.head.rotation.y)*Math.min(1,dt*4);
+}
+function headPos(p){const v=new THREE.Vector3();p.head.getWorldPosition(v);return v;}
+const JUDGE_POS={x:0,y:2.9,z:-8.9};
+function loop(){
+ requestAnimationFrame(loop);if(!R)return;const dt=Math.min(0.05,clock.getDelta()),t=clock.elapsedTime;
+ const speaker=W.focus&&W.people[W.focus];
+ Object.values(W.people).forEach(p=>{if(!p.g.visible)return;p.lookAt=speaker&&speaker!==p?headPos(speaker):(p.lookAtJudge?JUDGE_POS:null);updatePerson(p,dt,t);});
+ W.spect.forEach(p=>{p.lookAt=speaker?headPos(speaker):null;updatePerson(p,dt,t);});
+ // camera
+ let yaw=W.look.yaw,pitch=W.look.pitch;
+ if(W.follow&&speaker&&(!W.manual||performance.now()-W.manual>4000)){const hp=headPos(speaker);const d=new THREE.Vector3().subVectors(hp,cam.position);yaw=Math.atan2(-d.x,d.z)*0.9;pitch=Math.atan2(d.y,Math.hypot(d.x,d.z))*0.85;W.look.yaw+=(yaw-W.look.yaw)*Math.min(1,dt*2.2);W.look.pitch+=(pitch-W.look.pitch)*Math.min(1,dt*2.2);}
+ const dir=new THREE.Vector3(-Math.sin(W.look.yaw)*Math.cos(W.look.pitch),Math.sin(W.look.pitch),Math.cos(W.look.yaw)*Math.cos(W.look.pitch));
+ cam.position.y=2.95+Math.sin(t*0.5)*0.004;cam.lookAt(cam.position.clone().add(dir));
+ // gavel anim
+ if(W.gavelT>0){W.gavelT-=dt;W.gavel.rotation.x=-Math.abs(Math.sin(W.gavelT*22))*0.9;}else if(W.gavel)W.gavel.rotation.x=0;
+ R.render(scene,cam);labels();
+}
+function labels(){
+ const el=$('#labels');const w=el.clientWidth,h=el.clientHeight;
+ Object.entries(W.people).forEach(([id,p])=>{let lb=W.labels[id];const per=G.cast[id];if(!per||!p.g.visible||per.hidden){if(lb)lb.style.opacity=0;return;}
+  if(!lb){lb=document.createElement('div');lb.className='nm';el.appendChild(lb);W.labels[id]=lb;}
+  const v=headPos(p);v.y+=0.25;v.project(cam);const vis=v.z<1&&v.x>-1.1&&v.x<1.1;const talk=W.focus===id;
+  lb.className='nm'+(talk?' talk':'');lb.innerHTML=esc(per.name)+(talk?'':`<i>${esc(shortRole(per))}</i>`);
+  lb.style.opacity=vis&&(talk||W.showNames)?1:0;lb.style.transform=`translate(${(v.x+1)/2*w}px,${(1-v.y)/2*h}px) translate(-50%,-100%)`;});
+}
+function shortRole(p){return ({pros:'State',def:'Defense',dft:'Defendant',clerk:'Clerk',bailiff:'Bailiff'})[p.id]||(p.role||'').split(',')[0];}
+
+/* ===================================================== game state */
+const G={i:-1,phase:'',cast:{},tx:[],rulings:{},objs:[],busy:false,beat:0,done:[],paused:false,excluded:new Set(),career:{score:0,cases:0,rev:0,appr:60},waiting:null};
+const PHASES=['Call','Motions','Trial','Closing','Verdict','Sentence'];
+const C=()=>CASES[G.i];
+
+function addTx(who,text,cls){G.tx.push({who,text,cls});const d=document.createElement('div');d.className='ln '+(cls||'');d.innerHTML=(who?`<b>${esc(who)}</b>`:'')+esc(text);$('#tx').appendChild(d);d.scrollIntoView({block:'end'});}
+function setSub(name,text){const s=$('#sub');if(!text){s.innerHTML='';return;}s.innerHTML=`<div><b>${esc(name)}</b>${esc(text)}</div>`;}
+
+async function say(id,text){
+ if(!text)return;const per=G.cast[id];if(!per)return;const p=W.people[id];
+ W.focus=id;if(p){p.talk=1;if(p.sit>0.5&&['pros','def'].includes(id)&&G.phase!=='Call'){setSit(p,0);}}
+ setSub(per.name,text);addTx(per.name,text,'');
+ await Voice.say(text,per);
+ if(p){p.talk=0;if(p.home&&p.home.sit&&p.g.position.distanceTo(p.home.pos)<0.2)setSit(p,1);}
+ setSub();
+}
+function sys(t,cls){addTx('',t,'sys '+(cls||''));}
+function judgeSays(t){addTx(S.name,t,'judge');}
+
+function setPhase(ph){G.phase=ph;$('#phases').innerHTML=PHASES.map(x=>{const i=PHASES.indexOf(x),c=PHASES.indexOf(ph);return `<i class="${x===ph?'on':i<c?'done':''}">${x}</i>`;}).join('');updateNext();}
+function updateNext(){const b=$('#next');const lab={'':'Begin session',Call:'Hear motions',Motions:'Proceed to trial',Trial:'Continue',Closing:'Closing arguments',Verdict:'Deliver verdict',Sentence:'Sentence',End:'Next case'};
+ b.textContent=G.busy?'In progress…':(G.phase==='Trial'&&G.beat>=C().script.length?'Hear closing arguments':lab[G.phase]||'Continue');b.disabled=G.busy||!!G.waiting;$('#send').disabled=!G.phase||G.phase==='End';}
+
+/* ---------------- cast */
+function loadCast(c){
+ // remove old
+ Object.entries(W.people).forEach(([id,p])=>{if(R)scene.remove(p.g);});Object.values(W.labels).forEach(l=>l.remove());W.people={};W.labels={};G.cast={};
+ const list=[STAFF.clerk,STAFF.bailiff,...c.people];
+ let gi=0;
+ list.forEach(per=>{G.cast[per.id]=per;if(per.hidden||per.seat==='none')return;
+  if(!R)return;const p=makePerson(per.look);scene.add(p.g);W.people[per.id]=p;
+  if(per.seat==='gallery'){const [x,z]=GAL[gi++%GAL.length];const pos=new THREE.Vector3(x,0,z);p.g.position.copy(pos);p.g.rotation.y=Math.PI;p.face=Math.PI;p.home={pos,r:Math.PI,sit:true};setSit(p,1,true);}
+  else{seatPerson(p,per.seat,true);p.face=SEAT[per.seat].r;}
+  if(per.id==='pros'||per.id==='def'||per.id==='dft')p.lookAtJudge=true;});
+ // to-select
+ const sel=$('#to');sel.innerHTML='<option value="room">The courtroom</option>'+Object.values(G.cast).filter(p=>!p.hidden&&p.seat!=='none').map(p=>`<option value="${p.id}">${esc(p.name)} — ${esc(shortRole(p))}</option>`).join('');
+}
+async function callWitness(id){const p=W.people[id];if(!p)return;const per=G.cast[id];sys(`${per.name} takes the witness stand.`);G.onStand=id;
+ if(id==='dft'&&p){}
+ W.focus=id;await walkTo(p,new THREE.Vector3(...SEAT.stand.p),SEAT.stand.r,true);p.lookAtJudge=true;}
+async function stepDown(id){const p=W.people[id];if(!p)return;G.onStand=null;p.lookAtJudge=false;const h=p.home||{pos:new THREE.Vector3(0,0,3),r:Math.PI,sit:true};
+ if(G.cast[id].seat==='dft'){const s=SEAT.dft;walkTo(p,new THREE.Vector3(...s.p),s.r,true).then(()=>p.lookAtJudge=true);}else walkTo(p,h.pos,h.r,h.sit);await sleep(400);}
+
+/* ---------------- side panels */
+function renderFile(){const c=C();if(!c){$('#t-file').innerHTML='<p class="hint">No case called.</p>';return;}
+ $('#t-file').innerHTML=`<div class="hint">${esc(c.docket)} · ${esc(c.tier)}</div><h4>Charges</h4>`+c.charges.map(ch=>`<div class="charge"><code>${esc(ch.code)}</code><div>${esc(ch.desc)}</div><small>${esc(ch.cls)}</small></div>`).join('')+
+ `<h4>Documents (${c.docs.length})</h4><div class="doclist">`+c.docs.map(d=>`<button class="docbtn${G.excluded.has(d.id)?' x':''}" data-doc="${d.id}"><i class="k">${esc(d.kind)}</i><span>${esc(d.title)}</span></button>`).join('')+'</div>'+
+ `<h4>In the room</h4><div class="people">`+Object.values(G.cast).filter(p=>!p.hidden&&p.seat!=='none').map(p=>`<div class="pp"><b>${esc(p.name)}</b><span>${esc(p.role)}</span><button data-addr="${p.id}">Address</button></div>`).join('')+'</div>';}
+function renderRulings(){const c=C();if(!c){$('#t-rul').innerHTML='';return;}
+ let h='<h4>Pretrial motions</h4>'+c.motions.map(m=>{const r=G.rulings[m.id];return `<div class="rul"><small>${esc(G.cast[m.by]?G.cast[m.by].name:'')}</small><b>${esc(m.title)}</b><p>${esc(m.text)}</p><div class="r ${r==null?'pend':''}">${r==null?'Awaiting ruling':esc('Ruled: '+m.options[r])}</div></div>`;}).join('');
+ if(G.objs.length)h+='<h4>Objections</h4>'+G.objs.map(o=>`<div class="rul"><small>${esc(o.byName)} · ${esc(o.grounds)}</small><p>“${esc(o.q)}”</p><div class="r">${o.ruled?esc(o.ruled==='sustain'?'Sustained':'Overruled'):'Pending'}</div></div>`).join('');
+ $('#t-rul').innerHTML=h;}
+function tab(t){document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['file','rul','tx'].forEach(k=>$('#t-'+k).hidden=k!==t);if(t==='rul')$('#rul-badge').hidden=true;}
+function openDoc(id){const c=C();const d=c.docs.find(x=>x.id===id);if(!d)return;
+ let h=`<button class="x" id="dx">Close</button><div class="dh">${esc(d.head||d.title)}<small>${esc(c.title.toUpperCase())} · CASE ${esc(c.docket)}</small></div>`;
+ if(G.excluded.has(d.id))h+='<div class="stamp">EXCLUDED</div>';else if(d.stamp)h+=`<div class="stamp">${esc(d.stamp)}</div>`;
+ if(d.fields)h+='<div class="tbl-wrap"><table class="fl">'+d.fields.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')+'</table></div>';
+ if(d.table)h+='<div class="tbl-wrap"><table><tr>'+d.table[0].map(x=>`<th>${esc(x)}</th>`).join('')+'</tr>'+d.table.slice(1).map(r=>'<tr>'+r.map(x=>`<td>${esc(x)}</td>`).join('')+'</tr>').join('')+'</table></div>';
+ if(d.body)h+=d.body.map(([k,v])=>`<h5>${esc(k)}</h5><div class="tx">${esc(v)}</div>`).join('');
+ $('#paper').innerHTML=h;$('#docov').hidden=false;$('#dx').onclick=()=>$('#docov').hidden=true;}
+
+/* ---------------- decisions */
+function decide(kind,title,text,opts,note){return new Promise(res=>{G.waiting=kind;updateNext();const d=$('#decide');
+ d.innerHTML=`<small>${esc(kind)}</small><h3>${esc(title)}</h3>${text?`<p>${esc(text)}</p>`:''}<div class="opts">${opts.map((o,i)=>`<button data-i="${i}">${esc(o)}</button>`).join('')}</div>${note?`<div class="note">${esc(note)}</div>`:''}`;
+ d.hidden=false;setSub();G.dOpts=opts;G.pick=i=>{d.hidden=true;G.waiting=null;G.pick=null;G.dOpts=null;updateNext();res(i);};d.querySelectorAll('button').forEach(b=>b.onclick=()=>G.pick&&G.pick(+b.dataset.i));});}
+
+/* ---------------- flow */
+async function run(fn){if(G.busy)return;G.busy=true;updateNext();try{await fn();}catch(e){console.error(e);sys('Something went wrong: '+e.message,'bad');}G.busy=false;updateNext();
+ if(G.queued&&G.queued.length){const q=G.queued.shift();run(()=>respond(q.txt,q.to));}}
+function nextClicked(){ctx();
+ if(G.phase===''||G.phase==='End'){return startCase(G.i+1);}
+ if(G.phase==='Call')return run(doMotions);
+ if(G.phase==='Motions')return run(()=>{setPhase('Trial');sys('Trial begins. The State may call its first witness.');return trialRun();});
+ if(G.phase==='Trial'){if(G.beat>=C().script.length)return run(doClosing);return run(trialRun);}
+ if(G.phase==='Closing')return run(doClosing);
+ if(G.phase==='Verdict')return run(doVerdict);
+ if(G.phase==='Sentence')return run(doSentence);
+}
+async function startCase(i){
+ if(i>=CASES.length){return endDay();}
+ G.i=i;G.rulings={};G.objs=[];G.beat=0;G.excluded=new Set();G.verdict=null;G.sent=null;G.aiObjs=0;G.onStand=null;$('#tx').innerHTML='';G.tx=[];
+ const c=C();loadCast(c);renderFile();renderRulings();tab('file');
+ $('#cp-title').textContent=c.title;$('#cp-sub').textContent=`${c.docket} · ${c.tier}`;$('#s-docket').textContent=`${i+1} / ${CASES.length}`;
+ setPhase('Call');
+ run(async()=>{
+  await sleep(500);await say('bailiff','All rise. Courtroom 4B is now in session, the Honorable '+S.name+' presiding.');gavel(1);
+  await say('clerk',`Calling case number ${spellDocket(c.docket)}, the State of Harlan versus ${G.cast.dft.name}. The defendant is charged with ${c.charges.map(x=>x.desc.split('(')[0].split(' —')[0].toLowerCase().trim()).join(', and ')}.`);
+  await say('pros',`${G.cast.pros.name.replace(/^(Chief )?ADA /,'')} for the State, Your Honor.`);
+  if(!G.cast.def.hidden)await say('def',`Good morning, Your Honor. ${G.cast.def.name.replace(', Esq.','')} on behalf of ${G.cast.dft.look.f?'Ms.':'Mr.'} ${G.cast.dft.name.split(' ').slice(-1)[0]}, who is present.`);
+  else await say('dft','Darnell Okafor, Your Honor. I\'m representing myself.');
+  await say('dft',c.tier.startsWith('Traffic')?'I\'m pleading not responsible, Your Honor.':'Not guilty, Your Honor.');
+  sys('Read the case file before you hear motions. You may question anyone from the bench at any time.');
+ });
+}
+function spellDocket(d){return d.replace(/-/g,' ').replace(/(\d)(\d)(\d)(\d)(\d)(\d)$/,'$1$2$3 $4$5$6');}
+async function doMotions(){
+ setPhase('Motions');const c=C();
+ for(const m of c.motions){if(G.rulings[m.id]!=null)continue;
+  const opp=m.by==='pros'?'def':'pros';const oppId=G.cast[opp]&&!G.cast[opp].hidden?opp:'pros';
+  sys('Motion: '+m.title);
+  await say(m.by,m.pro);await say(m.by===oppId?'pros':oppId,m.con);
+  $('#rul-badge').hidden=false;renderRulings();
+  const r=await decide('Ruling on motion',m.title,m.text,m.options,'Open the case file to check the documents before you rule. You can also question counsel first, then rule.');
+  G.rulings[m.id]=r;judgeSays(`On the ${m.title.toLowerCase()}: ${m.options[r].split('—')[0].trim()}.`);gavel(1);
+  const granted=/^(Grant|Sustain)/.test(m.options[r]);if(granted&&m.excl)m.excl.forEach(x=>G.excluded.add(x));
+  renderRulings();renderFile();
+  await say('clerk','So noted for the record.');
+ }
+ sys('All motions ruled. Proceed to trial when ready.');
+}
+async function trialRun(){
+ const c=C();
+ while(G.beat<c.script.length){
+  const b=c.script[G.beat++];
+  if(b.call){await callWitness(b.call);continue;}
+  if(b.back){await stepDown(b.back);continue;}
+  if(b.obj){await objection(b.obj);continue;}
+  // skip lines whose evidence was excluded? keep simple
+  await say(b.who,b.t);
+  if(!S.auto){updateNext();return;}
+  if(G.stop){G.stop=false;return;}
+ }
+ sys('Both sides have rested. Proceed to closing arguments.');
+}
+async function objection(o){
+ const per=G.cast[o.by];const rec={by:o.by,byName:per?per.name:'Counsel',grounds:o.grounds,q:o.q,correct:o.correct,why:o.why};G.objs.push(rec);renderRulings();
+ await say(o.by,`Objection, Your Honor. ${o.grounds}.`);
+ const r=await decide('Objection — '+o.grounds,`“${o.q}”`,'',['Sustained','Overruled'],'Rule on the objection.');
+ rec.ruled=r===0?'sustain':'overrule';judgeSays(r===0?'Sustained.':'Overruled. The witness may answer.');renderRulings();
+ if(r===1&&G.onStand){await say(G.onStand,aiOn()?await quickAnswer(o.q):'I\'ll answer. I\'d rather not guess, Your Honor, but I\'ll do my best.');}
+}
+async function quickAnswer(q){try{const t=await aiText(basePrompt()+`\n\nThe judge just OVERRULED an objection to this question to the witness ${G.cast[G.onStand].name}: "${q}". Write ONLY the witness's in-character answer (1-2 sentences). Return JSON {"text":"..."}`);const j=parseJSON(t);return (j&&j.text)||'Yes.';}catch(e){return 'I\'ll answer that, Your Honor.';}}
+async function doClosing(){setPhase('Closing');if(G.onStand)await stepDown(G.onStand);for(const l of C().closing)await say(l.who,l.t);setPhase('Verdict');sys('The case is submitted. Review the file and deliver your verdict.');}
+async function doVerdict(){
+ const c=C();const r=await decide('Verdict',c.title,'This is a bench trial. You are the finder of fact. Consider only evidence you admitted.',c.verdicts.map(v=>v.label));
+ G.verdict=c.verdicts[r];await say('bailiff','The defendant will rise.');const dp=W.people.dft;if(dp)setSit(dp,0);
+ judgeSays(`On the charge before the court, the court finds the defendant: ${G.verdict.label.toLowerCase()}.`);gavel(2);sys('Verdict: '+G.verdict.label,'ok');
+ await sleep(600);
+ if(aiOn()){try{const t=await aiText(basePrompt()+`\n\nThe judge has just announced the verdict: "${G.verdict.label}". Give 1-3 short natural reactions (defendant, counsel, maybe someone in the gallery). Return JSON {"lines":[{"speaker":"id","text":"..."}]}`);const j=parseJSON(t);if(j&&j.lines)for(const l of j.lines.slice(0,3))if(G.cast[l.speaker])await say(l.speaker,l.text);}catch(e){}}
+ else await say('dft',GUILTY.has(G.verdict.k)?'...Yes, Your Honor.':'Thank you. Thank you, Your Honor.');
+ if(GUILTY.has(G.verdict.k)){setPhase('Sentence');sys('Proceed to sentencing.');}else{G.sent=null;finishCase();}
+}
+function doSentence(){return new Promise(res=>{
+ const c=C(),s=c.sentence;const u=s.jailUnit||'days';
+ const isInf=s.kind==='infraction';
+ $('#gencard').innerHTML=`<div class="sub">${esc(c.docket)} · Sentencing</div><h2>${esc(G.cast.dft.name)}</h2><p>Adjudicated: ${esc(G.verdict.label)}.</p><div class="guide">${esc(s.note||'')}</div>
+ <div class="sgrid">
+  ${isInf?'':`<label class="form" style="margin:0;display:grid">Incarceration (${u})<input type="number" id="sj" min="0" max="${s.jailMax}" value="0"></label>`}
+  <label class="form" style="margin:0;display:grid">Fine ($)<input type="number" id="sf" min="0" max="${s.fineMax||300}" value="${s.fineMin||0}"></label>
+  ${isInf?'':`<label class="form" style="margin:0;display:grid">Probation (months)<input type="number" id="sp" min="0" max="${s.probMax}" value="0"></label>`}
+ </div><div class="extras">${(s.extras||[]).map(e=>`<label class="chk form" style="margin:0"><input type="checkbox" data-x="${e.k}">${esc(e.label)}</label>`).join('')}</div>
+ <p class="hint">Statutory limits: ${isInf?'civil penalty only':`incarceration up to ${s.jailMax} ${u}, fine up to $${(s.fineMax||0).toLocaleString()}, probation up to ${s.probMax} months`}. Check the sentencing documents in the case file.</p>
+ <div class="row"><button class="btn" id="sgo">Impose sentence</button><button class="btn ghost" id="sfile">Open case file</button></div>`;
+ $('#genov').hidden=false;$('#sfile').onclick=()=>{$('#genov').hidden=true;tab('file');G.waiting=null;updateNext();res();};
+ G.waiting='sentence';
+ $('#sgo').onclick=async()=>{const v=id=>Math.max(0,+($(id)&&$(id).value)||0);
+  G.sent={jail:isInf?0:Math.min(s.jailMax,v('#sj')),fine:v('#sf'),prob:isInf?0:Math.min(s.probMax,v('#sp')),x:[...document.querySelectorAll('[data-x]')].filter(i=>i.checked).map(i=>i.dataset.x)};
+  $('#genov').hidden=true;G.waiting=null;
+  const parts=[];if(G.sent.jail)parts.push(`${G.sent.jail} ${u} ${s.kind==='felony'?'in state prison':'in county jail'}`);if(G.sent.prob)parts.push(`${G.sent.prob} months probation`);if(G.sent.fine)parts.push(`a fine of $${G.sent.fine.toLocaleString()}`);
+  (s.extras||[]).filter(e=>G.sent.x.includes(e.k)).forEach(e=>parts.push(e.label.split('(')[0].split('—')[0].trim().toLowerCase()));
+  judgeSays('The court sentences the defendant to '+(parts.length?parts.join('; '):'no further penalty')+'.');gavel(1);
+  G.busy=true;updateNext();await say('clerk','So ordered. The defendant is remanded to the custody of the sheriff for processing.');G.busy=false;finishCase();res();};
+});}
+function finishCase(){
+ const c=C();let mot=0,motMax=30,ob=0,obMax=15,ver=G.verdict?G.verdict.score:0,sen=0;const notes=[];let rev=0;
+ const per=motMax/c.motions.length;c.motions.forEach(m=>{const ok=G.rulings[m.id]===m.correct;if(ok)mot+=per;else{rev++;notes.push({bad:1,t:`${m.title}: you ruled "${m.options[G.rulings[m.id]]}". ${m.why}`});}});
+ if(G.objs.length){const po=obMax/G.objs.length;G.objs.forEach(o=>{if(o.ruled===o.correct)ob+=po;else notes.push({bad:1,t:`Objection (${o.grounds}) — should be ${o.correct==='sustain'?'sustained':'overruled'}. ${o.why}`});});}else ob=obMax;
+ const vBest=Math.max(...c.verdicts.map(v=>v.score));if(G.verdict.score<vBest)notes.push({bad:G.verdict.score===0,t:'Verdict: '+c.verdictWhy});else notes.push({t:'Verdict: '+c.verdictWhy});
+ const s=c.sentence,gd=s.guide||{};
+ if(!GUILTY.has(G.verdict.k)){sen=G.verdict.score===vBest?20:0;}
+ else if(G.sent){const inR=(v,r)=>!r||(v>=r[0]&&v<=r[1]);let pts=0;
+  if(s.kind==='infraction'){pts=inR(G.sent.fine,gd.fine)?20:6;if(pts<20)notes.push({bad:1,t:`Sentence: civil penalty should be $${gd.fine[0]}–$${gd.fine[1]}.`});}
+  else{if(inR(G.sent.jail,gd.jail))pts+=7;else notes.push({bad:1,t:`Sentence: incarceration of ${G.sent.jail} ${s.jailUnit} is outside the expected ${gd.jail[0]}–${gd.jail[1]} ${s.jailUnit}.`});
+   if(inR(G.sent.fine,gd.fine))pts+=4;else notes.push({bad:1,t:`Sentence: fine should fall within $${gd.fine[0].toLocaleString()}–$${gd.fine[1].toLocaleString()}.`});
+   if(inR(G.sent.prob,gd.prob))pts+=4;else notes.push({bad:1,t:`Sentence: probation expected ${gd.prob[0]}–${gd.prob[1]} months.`});
+   const miss=(s.need||[]).filter(k=>!G.sent.x.includes(k));if(!miss.length)pts+=5;else notes.push({bad:1,t:'Sentence: missing required terms: '+miss.map(k=>s.extras.find(e=>e.k===k).label).join('; ')+'.'});
+   if(s.kind==='felony'&&G.sent.jail<gd.jail[0])rev++;}
+  sen=pts;}
+ const total=Math.round(mot+ob+ver+sen);const grade=total>=90?'A':total>=80?'B':total>=65?'C':total>=50?'D':'F';
+ G.career.cases++;G.career.score+=total;G.career.rev+=rev;G.career.appr=Math.max(5,Math.min(98,Math.round(G.career.appr+(total-70)/3)));
+ G.done[G.i]={total,grade};
+ $('#s-score').textContent=Math.round(G.career.score/G.career.cases);$('#s-rev').textContent=G.career.rev;$('#s-appr').textContent=G.career.appr+'%';
+ $('#gencard').innerHTML=`<div class="grade">${grade}</div><div class="sub">Appellate review · ${esc(c.docket)}</div><h2>${esc(c.title)}</h2>
+ <div class="res"><div><span>Pretrial rulings</span><b>${Math.round(mot)} / ${motMax}</b></div><div><span>Objections</span><b>${Math.round(ob)} / ${obMax}</b></div><div><span>Verdict</span><b>${ver} / 35</b></div><div><span>Sentence</span><b>${sen} / 20</b></div><div><span><b>Total</b></span><b>${total} / 100</b></div></div>
+ ${rev?`<p><b style="color:var(--bad)">${rev} ruling${rev>1?'s':''} reversible on appeal.</b></p>`:'<p style="color:var(--ok)">No reversible error. The appellate court affirms.</p>'}
+ ${notes.map(n=>`<div class="why${n.bad?' bad':''}">${esc(n.t)}</div>`).join('')}
+ <details><summary class="hint">What really happened</summary><p class="hint">${esc(c.truth)}</p></details>
+ <div class="row"><button class="btn" id="nx">${G.i+1<CASES.length?'Call the next case':'Close the docket'}</button><button class="btn ghost" id="stay">Stay in this courtroom</button></div>`;
+ $('#genov').hidden=false;setPhase('End');
+ $('#nx').onclick=()=>{$('#genov').hidden=true;startCase(G.i+1);};$('#stay').onclick=()=>{$('#genov').hidden=true;};
+}
+function endDay(){const avg=G.career.cases?Math.round(G.career.score/G.career.cases):0;
+ $('#gencard').innerHTML=`<div class="sub">End of docket</div><h2>Court is adjourned.</h2><div class="res">${CASES.map((c,i)=>`<div><span>${esc(c.title)}</span><b>${G.done[i]?G.done[i].grade+' · '+G.done[i].total:'—'}</b></div>`).join('')}<div><span><b>Average</b></span><b>${avg}</b></div><div><span>Reversals</span><b>${G.career.rev}</b></div><div><span>Public approval</span><b>${G.career.appr}%</b></div></div>
+ <p>${avg>=85?'The Chief Judge is recommending you for the appellate bench.':avg>=65?'A solid day. The court of appeals will have little to say.':'The local paper is running an editorial about your courtroom.'}</p><div class="row"><button class="btn" id="again">Start a new docket</button></div>`;
+ $('#genov').hidden=false;setPhase('End');$('#again').onclick=()=>{G.done=[];G.career={score:0,cases:0,rev:0,appr:60};$('#genov').hidden=true;startCase(0);};}
+function gavel(n){gavelSound(n);if(W.gavel)W.gavelT=0.25*n;}
+
+/* ---------------- AI conversation */
+function docText(d){let t=`[${d.title}]`;if(d.fields)t+=' '+d.fields.map(([k,v])=>k+': '+v).join('; ');if(d.table)t+=' '+d.table.map(r=>r.join(' | ')).join(' / ');if(d.body)t+=' '+d.body.map(([k,v])=>k+': '+v).join(' ');return t;}
+function basePrompt(){const c=C();
+ const cast=Object.values(G.cast).filter(p=>!p.hidden&&p.seat!=='none').map(p=>`- id "${p.id}": ${p.name}, ${p.role}${G.onStand===p.id?' (CURRENTLY ON THE WITNESS STAND)':''}. Persona: ${p.persona}`).join('\n');
+ const rul=c.motions.filter(m=>G.rulings[m.id]!=null).map(m=>`${m.title}: ${m.options[G.rulings[m.id]]}`).join('; ')||'none yet';
+ const exc=[...G.excluded].map(id=>c.docs.find(d=>d.id===id).title).join('; ')||'none';
+ return `You voice every non-player character in a realistic US state criminal courtroom simulation. The player is the presiding judge, "${S.name}" (address them as "Your Honor"). Bench trial, no jury.
+CASE: ${c.title}, docket ${c.docket}. Charges: ${c.charges.map(x=>x.code+' '+x.desc).join('; ')}.
+CURRENT PHASE: ${G.phase}. ${G.onStand?'Witness on stand: '+G.cast[G.onStand].name+'.':'No one is on the witness stand.'}
+CHARACTERS:
+${cast}
+CASE FILE: ${c.docs.map(docText).join('\n')}
+EXCLUDED BY THE JUDGE'S RULINGS (lawyers must not rely on these; if someone mentions them, opposing counsel objects): ${exc}
+RULINGS SO FAR: ${rul}
+HIDDEN TRUTH (each character knows only what they would realistically know; witnesses may shade the truth per their persona, but nobody reveals what they could not know): ${c.truth}
+RECENT RECORD:
+${G.tx.slice(-24).map(l=>(l.who||'[note]')+': '+l.text).join('\n')}
+
+RULES: Stay strictly in character. Speak like real people in an American courtroom: concise spoken lines, 1-3 sentences each, no stage directions, no asterisks, no narration. Lawyers follow the rules of evidence and courtroom etiquette and make objections when there is a genuine legal basis (hearsay, leading on direct, speculation, relevance, argumentative, assumes facts, privilege, excluded evidence, etc.). Defer to the judge. If the judge gives an order, comply (the bailiff enforces). Never decide the verdict or sentence; that is the judge's role.`;}
+async function playerSay(spoken,toOverride){
+ const txt=(spoken||$('#msg').value).trim();if(!txt||!G.phase||G.phase==='End')return;if(!spoken)$('#msg').value='';ctx();
+ const to=toOverride||$('#to').value;const toName=to==='room'?'':(G.cast[to]?G.cast[to].name:'');
+ judgeSays((toName?'('+toName+') ':'')+txt);
+ if(/^(gavel|order|order in the court)/i.test(txt))gavel(3);
+ if(G.waiting){return respond(txt,to);}
+ if(G.busy){G.stop=true;G.queued=G.queued||[];G.queued.push({txt,to});sys('The proceedings pause for the bench.');return;}
+ await run(()=>respond(txt,to));
+}
+async function respond(txt,to){
+ if(!aiOn()){const id=to!=='room'?to:(G.onStand||'clerk');const per=G.cast[id];if(!per)return;
+  const canned=id==='bailiff'?'Yes, Your Honor.':id==='clerk'?'Noted for the record, Your Honor.':(id===G.onStand?pick(['Yes, Your Honor. That\'s what happened, as far as I remember.','I\'m not sure I understand the question, Your Honor.','I told the officers everything I knew.']):pick(['Understood, Your Honor.','Yes, Your Honor.','Thank you, Your Honor. We\'ll keep it brief.']));
+  await say(id,canned);sys('Add a Gemini key in Settings for live, in-character answers.');return;}
+ $('#thinking').hidden=false;let j=null;
+ try{const t=await aiText(basePrompt()+`
+
+THE JUDGE JUST SAID${to!=='room'?' TO '+G.cast[to].name+' (id "'+to+'")':' TO THE COURTROOM'}: "${txt}"
+
+Respond with what happens next in the room. The person addressed answers first. Others may respond if it is natural (e.g., opposing counsel objects to an improper question, a lawyer follows up, the defendant blurts something and their lawyer stops them). Keep it to 1-4 lines total. If a lawyer objects, END with that objection and set "objection" so the judge can rule; the objection line itself must be in "lines".
+Return ONLY JSON: {"lines":[{"speaker":"<id>","text":"<spoken words>"}],"objection":null or {"by":"<id>","grounds":"<short grounds>","question":"<the question objected to>","correct":"sustain" or "overrule","why":"<one-sentence legal reason>"}}`);
+  j=parseJSON(t);}catch(e){sys('Gemini did not answer: '+String(e.message).slice(0,140),'bad');}
+ $('#thinking').hidden=true;if(!j||!Array.isArray(j.lines))return;
+ for(const l of j.lines.slice(0,5)){if(G.cast[l.speaker]&&l.text)await say(l.speaker,String(l.text).replace(/\*[^*]*\*/g,'').trim());}
+ if(j.objection&&G.cast[j.objection.by]&&!G.waiting){const o=j.objection;const rec={by:o.by,byName:G.cast[o.by].name,grounds:o.grounds||'Objection',q:o.question||txt,correct:o.correct==='overrule'?'overrule':'sustain',why:o.why||'',ai:1};G.objs.push(rec);renderRulings();
+  const r=await decide('Objection — '+rec.grounds,`“${rec.q}”`,'',['Sustained','Overruled'],'Rule on the objection.');rec.ruled=r?'overrule':'sustain';judgeSays(r?'Overruled.':'Sustained.');renderRulings();
+  if(r===1&&G.onStand)await say(G.onStand,await quickAnswer(rec.q));}
+ }
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+/* ---------------- UI wiring */
+function fillSettings(){$('#s-key').value=S.key;$('#s-model').value=S.model;$('#s-tts').value=S.tts;$('#s-ai').checked=S.ai;$('#s-voice').checked=S.voice;$('#s-gvoice').checked=S.gvoice;$('#s-auto').checked=S.auto;$('#s-vol').value=S.vol;$('#s-pace').value=String(S.pace);$('#s-err').textContent='';}
+function readSettings(){S.key=$('#s-key').value.trim();S.model=$('#s-model').value.trim()||'gemini-3.8-flash';S.tts=$('#s-tts').value.trim()||'gemini-3.8-flash-tts';S.ai=$('#s-ai').checked;S.voice=$('#s-voice').checked;S.gvoice=$('#s-gvoice').checked;S.auto=$('#s-auto').checked;S.vol=Math.max(0,Math.min(100,+$('#s-vol').value||85));S.pace=+$('#s-pace').value||1;saveS();aiStat();Voice.fails=0;}
+function wire(){
+ $('#i-name').value=S.name;$('#i-key').value=S.key;
+ $('#go').onclick=()=>{S.name=$('#i-name').value.trim()||'Judge Hollis';S.key=$('#i-key').value.trim();saveS();aiStat();$('#intro').hidden=true;ctx();refreshPlate();startCase(0);};
+ $('#go-set').onclick=()=>{S.name=$('#i-name').value.trim()||S.name;S.key=$('#i-key').value.trim();fillSettings();$('#setov').hidden=false;};
+ $('#b-set').onclick=()=>{fillSettings();$('#setov').hidden=false;};
+ $('#s-close').onclick=()=>$('#setov').hidden=true;
+ $('#s-save').onclick=()=>{readSettings();$('#setov').hidden=true;};
+ $('#s-test').onclick=async()=>{readSettings();$('#s-err').textContent='Testing…';try{const t=await aiText('Reply with JSON {"ok":true}');$('#s-err').textContent='Dialogue works with '+S.model+'.';}catch(e){$('#s-err').textContent='Dialogue failed: '+String(e.message).slice(0,200);return;}
+  try{await Voice.gemini('The court is now in session.',STAFF.bailiff);$('#s-err').textContent+=' Voices work with '+S.tts+'.';}catch(e){$('#s-err').textContent+=' Voices failed ('+String(e.message).slice(0,120)+'); browser voices will be used.';}};
+ $('#b-docket').onclick=()=>{$('#gencard').innerHTML=`<div class="sub">Today's calendar</div><h2>Docket — Courtroom 4B</h2><div class="docket">${CASES.map((c,i)=>`<div class="dk${G.done[i]?' done':''}"><i>${i+1}</i><div><b>${esc(c.title)}</b><br><span>${esc(c.short)} · ${esc(c.docket)}</span></div><em>${G.done[i]?G.done[i].grade:i===G.i?'Now':c.tier.split(' ')[0]}</em></div>`).join('')}</div><div class="row"><button class="btn" id="dkc">Close</button></div>`;$('#genov').hidden=false;$('#dkc').onclick=()=>$('#genov').hidden=true;};
+ $('#next').onclick=nextClicked;$('#send').onclick=()=>playerSay();
+ $('#msg').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();playerSay();}});
+ $('#gavel').onclick=()=>{gavel(2);if(G.phase&&G.busy)G.stop=true;};
+ document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;if(e.key==='g'||e.key==='G')gavel(1);if(e.key==='Escape'){$('#docov').hidden=true;}});
+ $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.t);};
+ $('#t-file').onclick=e=>{const d=e.target.closest('[data-doc]');if(d)openDoc(d.dataset.doc);const a=e.target.closest('[data-addr]');if(a){$('#to').value=a.dataset.addr;$('#msg').focus();}};
+ $('#docov').onclick=e=>{if(e.target.id==='docov')$('#docov').hidden=true;};
+ $('#v-follow').onclick=e=>{W.follow=!W.follow;e.target.classList.toggle('on',W.follow);};
+ $('#v-reset').onclick=()=>{W.look.yaw=0;W.look.pitch=-0.12;W.manual=performance.now();if(cam){cam.fov=58;cam.updateProjectionMatrix();}};
+ W.showNames=true;
+ if('speechSynthesis' in window)speechSynthesis.onvoiceschanged=()=>{};
+}
+function refreshPlate(){if(!W.nameplate)return;const old=W.nameplate.material.map;W.nameplate.material.map=canvasTex(512,80,(g,w,h)=>{g.fillStyle='#b8933d';g.fillRect(0,0,w,h);g.fillStyle='#1f1505';g.font='700 38px Georgia';g.textAlign='center';g.textBaseline='middle';g.fillText(S.name.toUpperCase(),w/2,h/2+2);});W.nameplate.material.needsUpdate=true;old&&old.dispose();}
+aiStat();wire();initGL();setPhase('');renderFile();
+// preview cast so the room is populated behind the intro
+G.i=0;loadCast(CASES[0]);G.i=-1;
+
+/* ===================================================== push-to-talk + spoken commands */
+const norm=t=>t.toLowerCase().replace(/[^a-z0-9' ]+/g,' ').replace(/\s+/g,' ').trim();
+function matchOption(t,opts){const n=norm(t);
+ const rules=[[/\bnot guilty\b|\bacquit/,o=>/^not guilty/i.test(o)],[/\bnot responsible\b|\bdismiss/,o=>/not responsible|dismiss/i.test(o)],[/\bmanslaughter\b/,o=>/manslaughter/i.test(o)],[/\breckless\b/,o=>/reckless/i.test(o)],[/\blesser\b/,o=>/lesser/i.test(o)],[/\bgrand theft only\b/,o=>/grand theft only/i.test(o)],
+  [/\bsustain/,o=>/^sustain/i.test(o)],[/\boverrul/,o=>/^overrul/i.test(o)],[/\bgrant/,o=>/^grant/i.test(o)],[/\bden(y|ied)\b/,o=>/^deny/i.test(o)],[/\bguilty\b|\bresponsible\b|\bconvict/,o=>/^(guilty|responsible)/i.test(o)]];
+ for(const [re,f] of rules)if(re.test(n)){const i=opts.findIndex(f);if(i>=0)return i;}
+ let best=-1,bs=0;opts.forEach((o,i)=>{const w=norm(o).split(' ').filter(x=>x.length>3);const sc=w.filter(x=>n.includes(x)).length/Math.max(1,w.length);if(sc>bs){bs=sc;best=i;}});return bs>=0.5?best:-1;}
+function findAddressee(t){const n=' '+norm(t)+' ';let hit=null,pos=1e9;
+ Object.values(G.cast).forEach(p=>{if(p.hidden||p.seat==='none')return;const words=new Set();const nm=norm(p.name.replace(/,? esq\.?/i,'')).split(' ');words.add(nm[nm.length-1]);if(nm.length>1)words.add(nm[nm.length-2]);
+  ({pros:['prosecutor','state','prosecution','ada'],def:['defense','counsel for the defense','mr feld'],dft:['defendant'],bailiff:['bailiff','deputy sorensen'],clerk:['clerk','madam clerk']})[p.id]?.forEach(w=>words.add(w));
+  if(G.onStand===p.id){words.add('witness');}
+  if(/officer|ofc/i.test(p.name))words.add('officer');if(/^det\./i.test(p.name))words.add('detective');if(/^dep\./i.test(p.name))words.add('deputy');if(/^dr\./i.test(p.name))words.add('doctor');
+  words.forEach(w=>{if(w.length<3||w==='the')return;const i=n.indexOf(' '+w+' ');if(i>=0&&i<pos){pos=i;hit=p.id;}});});
+ return hit;}
+async function handleSpoken(t){
+ t=t.trim();if(!t)return;const n=norm(t);
+ if(G.pick&&G.dOpts){const i=matchOption(t,G.dOpts);if(i>=0){judgeSays(t);G.pick(i);return;}}
+ if($('#intro')&&!$('#intro').hidden){if(/\b(begin|start|take the bench|ready)\b/.test(n))$('#go').click();return;}
+ if(!$('#genov').hidden){const nx=$('#nx');if(nx&&/\b(next|call|proceed|continue|close)\b/.test(n)){nx.click();return;}
+  const sg=$('#sgo');if(sg){voiceSentence(t);return;}}
+ if(/^(gavel|order( order)?|order in the court)\b/.test(n)){gavel(3);if(G.busy)G.stop=true;judgeSays(t);return;}
+ if(/^(hold on|wait|pause|stop|one moment)\b/.test(n)){G.stop=true;Voice.stop();judgeSays(t);sys('The court pauses.');return;}
+ if(/^(proceed|continue|carry on|go ahead|go on|next|move on|let's (begin|proceed|continue|move on)|call (the )?next (case|witness)|hear (the )?motions|closing arguments|let's hear closing|i'?m ready (for|to deliver) (the )?verdict|deliver (the )?verdict|begin|you may proceed|please proceed)\b/.test(n)&&!G.busy&&!G.waiting){judgeSays(t);nextClicked();return;}
+ if(/\b(open|show me|read)\b.*\b(file|document|report|log|record|certificate|transcript|statement|scoresheet|guide)\b/.test(n)){const c=C();if(c){let best=null,bs=0;c.docs.forEach(d=>{const w=norm(d.title+' '+d.kind).split(' ').filter(x=>x.length>3);const sc=w.filter(x=>n.includes(x)).length;if(sc>bs){bs=sc;best=d;}});if(best){openDoc(best.id);return;}tab('file');return;}}
+ if(/^(close|close (the|that) (document|file))\b/.test(n)){$('#docov').hidden=true;return;}
+ const to=findAddressee(t)||(G.onStand&&/\?$|^(did|do|were|was|what|why|how|when|where|who|is|are|can|could|tell)\b/.test(n)?G.onStand:null);
+ if(to)$('#to').value=to;
+ await playerSay(t,to||$('#to').value);
+}
+function voiceSentence(t){const n=norm(t);const num=(re)=>{const m=n.match(re);return m?+m[1].replace(/,/g,''):null;};
+ const j=num(/(\d+)\s*(day|month|year)/);if(j!=null&&$('#sj')){const unit=(n.match(/\d+\s*(day|month|year)/)||[])[1];const u=C().sentence.jailUnit;let v=j;if(unit==='year'&&u==='months')v=j*12;$('#sj').value=v;}
+ const f=num(/\$?\s*([\d,]+)\s*(dollar|fine)|fine of \$?\s*([\d,]+)/);const fm=n.match(/fine (?:of )?\$?\s*([\d,]+)|([\d,]+) dollar/);if(fm&&$('#sf'))$('#sf').value=+(fm[1]||fm[2]).replace(/,/g,'');
+ const pm=n.match(/(\d+)\s*months? (?:of )?probation|probation (?:for |of )?(\d+)\s*months?/);if(pm&&$('#sp'))$('#sp').value=+(pm[1]||pm[2]);
+ document.querySelectorAll('[data-x]').forEach(cb=>{const lab=norm(cb.parentElement.textContent);const key=lab.split(' ').filter(w=>w.length>4).slice(0,2);if(key.some(w=>n.includes(w)))cb.checked=true;});
+ sys('Heard for sentencing: “'+t+'”. Say “impose sentence” or press the button when the form is right.');
+ if(/\b(impose|so ordered|that is the sentence|that's the sentence)\b/.test(n))$('#sgo').click();}
+
+const Mic={rec:null,on:false,buf:'',mode:null,media:null,chunks:[],
+ supported(){return !!(window.SpeechRecognition||window.webkitSpeechRecognition)||!!(navigator.mediaDevices&&window.MediaRecorder);},
+ async start(){if(this.on)return;this.on=true;this.buf='';ctx();duck(true);$('#mic').classList.add('on');setSub('Listening…','Speak now. Release Space when you finish.');
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(SR&&!this.srFailed){try{const r=new SR();this.rec=r;this.mode='sr';r.lang='en-US';r.continuous=true;r.interimResults=true;
+    r.onresult=e=>{let fin='',int='';for(let i=0;i<e.results.length;i++){const x=e.results[i];(x.isFinal?(fin+=x[0].transcript+' '):(int+=x[0].transcript));}this.buf=fin;const show=(fin+int).trim();if(show)setSub(S.name+' (speaking)',show);};
+    r.onerror=e=>{if(/not-allowed|service-not-allowed|audio-capture/.test(e.error)){this.srFailed=true;this.blocked(e.error);}};
+    r.onend=()=>{if(this.on&&this.mode==='sr'){try{r.start();}catch(_){}}};r.start();return;}catch(e){this.srFailed=true;}}
+  if(S.key&&navigator.mediaDevices){try{const st=await navigator.mediaDevices.getUserMedia({audio:true});this.mode='rec';this.chunks=[];const mr=new MediaRecorder(st);this.media=mr;mr.ondataavailable=e=>e.data.size&&this.chunks.push(e.data);mr.start();return;}catch(e){this.blocked(e.name||'blocked');}}
+  else this.blocked('no-api');},
+ async stop(){if(!this.on)return;this.on=false;$('#mic').classList.remove('on');duck(false);
+  if(this.mode==='sr'&&this.rec){const r=this.rec;this.rec=null;this.mode=null;await new Promise(res=>{let done=false;const fin=()=>{if(!done){done=true;res();}};r.onend=fin;try{r.stop();}catch(_){fin();}setTimeout(fin,1200);});
+   const t=this.buf.trim();setSub();if(t)handleSpoken(t);else if(!this.srFailed)sys('The court reporter did not catch that. Hold Space and speak again.');return;}
+  if(this.mode==='rec'&&this.media){const mr=this.media;this.media=null;this.mode=null;await new Promise(res=>{mr.onstop=res;mr.stop();});mr.stream.getTracks().forEach(t=>t.stop());
+   const blob=new Blob(this.chunks,{type:mr.mimeType||'audio/webm'});setSub('Court reporter','Transcribing…');
+   try{const b64=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.readAsDataURL(blob);});
+    const ms=[...new Set([S.model,'gemini-3.8-flash','gemini-flash-latest','gemini-2.5-flash'])];let text='';
+    for(const m of ms){try{const j=await gpost('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{contents:[{parts:[{inline_data:{mime_type:(blob.type||'audio/webm').split(';')[0],data:b64}},{text:'Transcribe this English speech exactly. Output only the words spoken, nothing else.'}]}]},30000);text=(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim();if(text)break;}catch(e){if(/401|403|API key/i.test(e.message))break;}}
+    setSub();if(text)handleSpoken(text);else sys('The court reporter did not catch that.','bad');}catch(e){setSub();sys('Transcription failed: '+e.message,'bad');}}
+  else setSub();},
+ blocked(why){this.on=false;$('#mic').classList.remove('on');duck(false);setSub();
+  sys('The microphone is blocked in this view ('+why+'). Open the downloadable copy of Courtroom 4B in Chrome or Edge to speak from the bench; typing still works here.','bad');}
+};
+function duck(on){try{if(AC){on?AC.suspend():AC.resume();}}catch(e){}try{if('speechSynthesis' in window){on?speechSynthesis.pause():speechSynthesis.resume();}}catch(e){}}
+(function wireMic(){const b=$('#mic');
+ const typing=e=>{const t=e.target;return t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT');};
+ document.addEventListener('keydown',e=>{if(e.code==='Space'&&!typing(e)&&$('#setov').hidden){e.preventDefault();if(!e.repeat)Mic.start();}},true);
+ document.addEventListener('keyup',e=>{if(e.code==='Space'&&Mic.on){e.preventDefault();Mic.stop();}},true);
+ b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);Mic.start();});
+ const up=()=>Mic.stop();b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);
+ window.addEventListener('blur',()=>{if(Mic.on)Mic.stop();});
+})();
+
+/* ask for the microphone up front so the browser shows its permission prompt */
+let micAsked=false;
+async function requestMic(){if(micAsked||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return;micAsked=true;
+ try{const st=await navigator.mediaDevices.getUserMedia({audio:true});st.getTracks().forEach(t=>t.stop());Mic.granted=true;}
+ catch(e){micAsked=false;}}
+requestMic();
+document.addEventListener('pointerdown',()=>requestMic(),{once:true,capture:true});
+$('#go').addEventListener('click',()=>requestMic());
+</script>
+</body></html>
