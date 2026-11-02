@@ -1278,7 +1278,7 @@ const Mic={
  text(){return (this.acc+' '+this.cur).replace(/\s+/g,' ').trim();},
  async start(){
   if(this.active||this.starting)return;
-  if(!this.supported){this.fail('unsupported');return;}
+  if(!this.supported){return this.recStart();}
   this.on=true;this.starting=true;this.wantStop=false;this.acc='';this.cur='';ctx();duck(true);$('#mic').classList.add('on');setSub(S.name+' (listening)','Speak now. Let go of Space when you finish.');
   if(!this.granted){
    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){this.starting=false;this.fail(window.isSecureContext===false?'insecure-context':'unsupported');return;}
@@ -1299,13 +1299,41 @@ const Mic={
    const was=this.active;this.active=false;if(was)this.finish();};
   try{r.start();this.rec=r;this.active=true;}catch(e){this.active=false;this.fail(String(e&&e.message||e));}
  },
- stop(){if(!this.on)return;this.wantStop=true;if(this.starting)return;
+ stop(){if(!this.on)return;if(this.media||this.recording){return this.recStop();}this.wantStop=true;if(this.starting)return;
   if(this.rec&&this.active){setTimeout(()=>{try{this.rec.stop();}catch(e){this.finish();}},250);}else this.finish();},
  finish(){if(!this.on)return;this.on=false;$('#mic').classList.remove('on');duck(false);
   const t=this.acc||this.text();this.acc='';this.cur='';
   if(t){setSub(S.name,t);setTimeout(()=>setSub(),1200);handleSpoken(t);}else{setSub();sys('The court reporter did not catch that. Hold Space and speak again.');}},
+ /* Firefox and other browsers without speech recognition: record, then Gemini transcribes */
+ async recStart(){
+  if(this.on)return;
+  if(!S.key){this.fail('no-key');return;}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){this.fail('unsupported');return;}
+  this.on=true;this.recording=true;this.chunks=[];ctx();duck(true);$('#mic').classList.add('on');setSub(S.name+' (recording)','Speak now. Let go of Space when you finish.');
+  try{const st=this.stream||await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});this.stream=st;this.granted=true;
+   if(!this.on){this.recording=false;return;}
+   const mr=new MediaRecorder(st);this.media=mr;mr.ondataavailable=e=>{if(e.data&&e.data.size)this.chunks.push(e.data);};mr.start(250);}
+  catch(e){this.recording=false;this.fail(e&&e.name==='NotFoundError'?'no-microphone':'not-allowed');}
+ },
+ async recStop(){
+  const mr=this.media;this.media=null;this.recording=false;this.on=false;$('#mic').classList.remove('on');duck(false);
+  if(!mr){setSub();return;}
+  await new Promise(res=>{mr.onstop=res;try{mr.stop();}catch(e){res();}setTimeout(res,1500);});
+  const blob=new Blob(this.chunks,{type:mr.mimeType||'audio/ogg'});this.chunks=[];
+  if(blob.size<1500){setSub();sys('That was too short to hear. Hold Space for the whole sentence.');return;}
+  setSub('Court reporter','Writing down what you said…');
+  try{const b64=await toWav16(blob);const models=(await listModels()).slice(0,4);let text='',err='';const t0=Date.now();
+   if(!models.length)err='your key returned no usable Gemini models';
+   for(const m of models){if(Date.now()-t0>20000)break;
+    try{const j=await gpost('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{contents:[{parts:[{inline_data:{mime_type:'audio/wav',data:b64}},{text:'Transcribe this English speech exactly. Output only the words spoken, nothing else. If there is no speech, output nothing.'}]}],generationConfig:{temperature:0}},12000);
+     text=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('').trim();if(text)break;err='no words heard';}
+    catch(e){err=String(e.message||e).slice(0,140);if(/401|403|API key/i.test(err))break;}}
+   if(text){setSub(S.name,text);setTimeout(()=>setSub(),1200);handleSpoken(text);}
+   else{const m='Could not transcribe ('+(err||'no answer')+').';setSub('Court reporter',m);sys(m,'bad');setTimeout(()=>setSub(),6000);}
+  }catch(e){const m='Transcription failed: '+String(e.message||e).slice(0,140);setSub('Court reporter',m);sys(m,'bad');setTimeout(()=>setSub(),6000);}
+ },
  fail(why){this.on=false;this.active=false;$('#mic').classList.remove('on');duck(false);
-  const msg={'not-allowed':'The microphone is blocked. Click the icon at the left of the address bar, set Microphone to Allow, and reload.','service-not-allowed':'Speech recognition is turned off in this browser. Use Chrome or Edge.','no-microphone':'No microphone was found.','insecure-context':'Speech needs a secure page. Open the game from GitHub Pages (https).','unsupported':'This browser has no speech recognition. Use Chrome or Edge.','network':'Speech recognition could not reach its service. Check your connection and try again.','audio-capture':'The microphone could not be opened. Check that no other app is using it.'}[why]||('Microphone error: '+why);
+  const msg={'not-allowed':'The microphone is blocked. Click the icon at the left of the address bar, set Microphone to Allow, and reload.','service-not-allowed':'Speech recognition is turned off in this browser. Use Chrome or Edge.','no-microphone':'No microphone was found.','insecure-context':'Speech needs a secure page. Open the game from GitHub Pages (https).','unsupported':'This browser cannot record audio. Update it, or use Chrome or Edge.','no-key':'In this browser, speech is transcribed by Gemini. Add your Gemini API key in Settings, then hold Space again.','network':'Speech recognition could not reach its service. Check your connection and try again.','audio-capture':'The microphone could not be opened. Check that no other app is using it.'}[why]||('Microphone error: '+why);
   setSub('Court reporter',msg);sys(msg,'bad');setTimeout(()=>{if($('#sub').textContent.includes(msg.slice(0,20)))setSub();},6000);}
 };
 function duck(on){try{if(AC){on?AC.suspend():AC.resume();}}catch(e){}try{if('speechSynthesis' in window){on?speechSynthesis.pause():speechSynthesis.resume();}}catch(e){}}
