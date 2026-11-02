@@ -176,6 +176,9 @@ table.bk td:first-child{font-weight:600;color:var(--brass2);white-space:nowrap}
 .bkm{border:1px solid var(--line);border-radius:3px;padding:8px 10px;margin:6px 0;background:var(--panel2)}
 .bkm b{font-weight:600}.bkm p{margin:4px 0;font-size:13px;color:#d3c6b1}
 .book ul{padding-left:18px}.book li{margin:5px 0}
+.tpick{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;align-items:center;margin:12px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
+.tpick label{font:600 10.5px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.tpick input{grid-column:1/-1}
 @media (max-width:900px){
  #work{grid-template-columns:1fr;grid-template-rows:minmax(260px,48vh) minmax(0,1fr)}
  .sgrid{grid-template-columns:1fr}
@@ -695,7 +698,7 @@ const rnd=(a,b)=>a+Math.random()*(b-a);
 const GUILTY=new Set(['g','resp','lesser','gt','man','reck']);
 
 /* ===================================================== settings */
-const S={gen:true,name:'Judge Hollis',key:'',model:'gemini-3.8-flash',tts:'gemini-3.8-flash-tts',ai:true,voice:true,gvoice:true,auto:true,vol:85,pace:1};
+const S={caseType:'random',caseCustom:'',gen:true,name:'Judge Hollis',key:'',model:'gemini-3.8-flash',tts:'gemini-3.8-flash-tts',ai:true,voice:true,gvoice:true,auto:true,vol:85,pace:1};
 try{Object.assign(S,JSON.parse(localStorage.getItem('court4b.set')||'{}'));}catch(e){}
 function saveS(){try{localStorage.setItem('court4b.set',JSON.stringify(S));}catch(e){}}
 const aiOn=()=>!!(S.ai&&S.key);
@@ -1072,8 +1075,9 @@ function nextClicked(){ctx();
 }
 async function startCase(i){
  if(i>=DOCKET.length){return endDay();}
- if(S.gen&&aiOn()&&!(DOCKET[i]&&DOCKET[i].generated)){
-  const ok=await prepareCase(i,true);if(!ok)sys('Gemini could not draft a new case, so the court is using a case from the standard docket.','bad');}
+ if(S.gen&&aiOn()&&!(DOCKET[i]&&DOCKET[i].generated&&DOCKET[i].typeKey===typeKey())){
+  const ok=await prepareCase(i,true);if(!ok){DOCKET[i]=builtinFor(i);sys('Gemini could not draft a new case, so the court is using a case from the standard docket.','bad');}}
+ else if(!(S.gen&&aiOn())){DOCKET[i]=builtinFor(i);if(S.caseType!=='random'&&!CASE_TYPES[S.caseType].builtin)setTimeout(()=>sys('Writing a new '+CASE_TYPES[S.caseType].label.toLowerCase()+' case needs a Gemini key, so this is a standard case.','bad'),2500);}
  prefetch(i+1);
  G.i=i;bookCase=null;G.rulings={};G.objs=[];G.beat=0;G.excluded=new Set();G.verdict=null;G.sent=null;G.aiObjs=0;G.onStand=null;$('#tx').innerHTML='';G.tx=[];
  const c=C();loadCast(c);renderFile();renderRulings();tab('file');Bench.page=0;renderBench();
@@ -1540,21 +1544,21 @@ const THEMES=['a food truck dispute','a hospital parking garage','a youth soccer
 const GEN={};const genBusy={};
 function pastTitles(){try{return JSON.parse(localStorage.getItem('court4b.past')||'[]');}catch(e){return [];}}
 function remember(t){try{const a=pastTitles();a.push(t);localStorage.setItem('court4b.past',JSON.stringify(a.slice(-40)));}catch(e){}}
-function prefetch(i){if(i<DOCKET.length&&S.gen&&aiOn()&&!(DOCKET[i]&&DOCKET[i].generated))prepareCase(i,false);}
+function prefetch(i){if(i<DOCKET.length&&S.gen&&aiOn()&&!(DOCKET[i]&&DOCKET[i].generated&&DOCKET[i].typeKey===typeKey()))prepareCase(i,false);}
 async function prepareCase(i,show){
- if(GEN[i]){DOCKET[i]=GEN[i];return true;}
+ const key=typeKey();if(GEN[i]&&GEN[i].typeKey===key){DOCKET[i]=GEN[i];return true;}
  if(show){$('#gencard').innerHTML=`<div class="sub">Clerk's office</div><h2>Preparing the case file…</h2><p>Gemini is drafting case ${i+1} of ${DOCKET.length}: the charges, police reports, witness statements and evidence. This takes about half a minute.</p><p class="hint" id="genstat">Drafting documents…</p>`;$('#genov').hidden=false;}
- if(!genBusy[i])genBusy[i]=genCase(i).then(c=>{if(c){GEN[i]=c;}return c;}).catch(e=>{console.warn('gen',e);return null;});
- const c=await genBusy[i];delete genBusy[i];
+ const bk=i+'|'+key;if(!genBusy[bk])genBusy[bk]=genCase(i).then(c=>{if(c){c.typeKey=key;GEN[i]=c;}return c;}).catch(e=>{console.warn('gen',e);return null;});
+ const c=await genBusy[bk];delete genBusy[bk];if(c&&c.typeKey!==typeKey())return false;
  if(show)$('#genov').hidden=true;
  if(c){DOCKET[i]=c;return true;}return false;
 }
 async function genCase(i){
- const tier=TIERS[i]||'Misdemeanor';const theme=THEMES[Math.floor(Math.random()*THEMES.length)];const guiltyAns=Math.random()<0.5;
+ const T=CASE_TYPES[S.caseType]||CASE_TYPES.random;const custom=S.caseType==='custom'&&S.caseCustom.trim();const tier=S.caseType==='random'||!T.tier?(custom?customTier(S.caseCustom):(TIERS[i]||'Misdemeanor')):T.tier;const theme=THEMES[Math.floor(Math.random()*THEMES.length)];const guiltyAns=Math.random()<0.5;
  const ex=JSON.parse(JSON.stringify(CASES[2]));delete ex.truth;
  const prompt=`You write realistic, original US state criminal court cases for a courtroom simulation game where the player is the judge (bench trial, no jury). Write ONE complete new case as JSON in EXACTLY the same structure as the example below.
 
-TIER: ${tier}. ${tier.includes('Homicide')?'A homicide (murder, manslaughter, or vehicular homicide).':tier==='Traffic infraction'?'A non-criminal traffic ticket (not DUI).':tier==='Criminal traffic'?'A criminal traffic offense (DUI, leaving the scene, driving while license suspended, reckless driving, etc.).':tier==='Felony'?'A non-homicide felony (robbery, burglary, aggravated assault, drug trafficking, fraud, arson, etc.).':'A misdemeanor (theft, battery, trespass, criminal mischief, resisting without violence, etc.).'}
+TIER: ${tier}.${S.caseType!=='random'&&T.desc?' CASE TYPE REQUIRED: '+T.desc+'.':''}${custom?' THE JUDGE ASKED FOR THIS CASE (follow it closely, choose the right tier): "'+S.caseCustom.trim().slice(0,400)+'".':''} ${tier.includes('Homicide')?'A homicide (murder, manslaughter, or vehicular homicide).':tier==='Traffic infraction'?'A non-criminal traffic ticket (not DUI).':tier==='Criminal traffic'?'A criminal traffic offense (DUI, leaving the scene, driving while license suspended, reckless driving, etc.).':tier==='Felony'?'A non-homicide felony (robbery, burglary, aggravated assault, drug trafficking, fraud, arson, etc.).':'A misdemeanor (theft, battery, trespass, criminal mischief, resisting without violence, etc.).'}
 SETTING IDEA (use it loosely): ${theme}. The state is the fictional "State of Harlan", Harlan County, city of Harlan. Date in 2026.
 Avoid repeating these earlier cases: ${pastTitles().slice(-12).join('; ')||'none'}.
 The legally correct verdict for this case should be ${guiltyAns?'GUILTY (the admissible evidence proves it)':'NOT GUILTY / not responsible (a defense succeeds or the admissible evidence falls short)'}.
@@ -1699,5 +1703,38 @@ aiStat();wire();initGL();setPhase('');renderFile();
 // preview cast so the room is populated behind the intro
 G.i=0;loadCast(DOCKET[0]);G.i=-1;
 renderBench();
+
+/* ===================================================== case type picker */
+const CASE_TYPES={
+ random:{label:'Random (mixed docket)'},
+ traffic:{label:'Traffic ticket',tier:'Traffic infraction',desc:'a non-criminal traffic ticket such as speeding, running a red light, careless driving or an equipment violation',builtin:'okafor'},
+ theft:{label:'Theft or shoplifting',tier:'Misdemeanor',desc:'a theft case: shoplifting, petit theft, theft from an employer, or receiving stolen property',builtin:'brennan'},
+ assault:{label:'Assault or battery',tier:'Misdemeanor',desc:'a simple assault or battery case',builtin:'whitlock'},
+ dv:{label:'Domestic violence',tier:'Misdemeanor',desc:'a domestic battery or violation of a protective order case'},
+ dui:{label:'DUI or criminal traffic',tier:'Criminal traffic',desc:'a DUI, leaving the scene of a crash, or driving while license suspended case',builtin:'paxton'},
+ drugs:{label:'Drug possession or dealing',tier:'Felony',desc:'a controlled substance possession, possession with intent, or trafficking case'},
+ burglary:{label:'Burglary or robbery',tier:'Felony',desc:'a burglary or robbery case',builtin:'hale'},
+ fraud:{label:'Fraud or identity theft',tier:'Felony',desc:'a fraud, forgery, check fraud, or identity theft case'},
+ weapons:{label:'Weapons offense',tier:'Felony',desc:'a weapons case: felon in possession, carrying a concealed firearm, or aggravated assault with a deadly weapon'},
+ homicide:{label:'Homicide',tier:'Felony — Homicide',desc:'a homicide: murder, manslaughter or vehicular homicide',builtin:'varga'},
+ custom:{label:'Describe your own…'}};
+try{const t=JSON.parse(localStorage.getItem('court4b.type')||'null');if(t&&CASE_TYPES[t.type]){S.caseType=t.type;S.caseCustom=t.custom||'';}}catch(e){}
+function typeKey(){return S.caseType+(S.caseType==='custom'?':'+S.caseCustom.trim():'');}
+function customTier(t){const n=t.toLowerCase();if(/murder|homicide|kill|manslaughter|shot|stabbed|death/.test(n))return 'Felony — Homicide';if(/dui|drunk|driving|license|hit and run|crash/.test(n))return 'Criminal traffic';if(/speed|ticket|red light|parking/.test(n))return 'Traffic infraction';if(/robbery|burglary|traffick|fraud|arson|gun|weapon|kidnap|felony|embezzl/.test(n))return 'Felony';return 'Misdemeanor';}
+function builtinFor(i){const t=CASE_TYPES[S.caseType];if(t&&t.builtin){const c=CASES.find(x=>x.id===t.builtin);if(c)return c;}return CASES[i]||CASES[0];}
+function setCaseType(type,custom){const old=typeKey();S.caseType=CASE_TYPES[type]?type:'random';if(custom!=null)S.caseCustom=custom;try{localStorage.setItem('court4b.type',JSON.stringify({type:S.caseType,custom:S.caseCustom}));}catch(e){}
+ if(typeKey()!==old){for(let k=Math.max(0,G.i+1);k<DOCKET.length;k++){if(GEN[k]&&GEN[k].typeKey!==typeKey())delete GEN[k];if(!(DOCKET[k]&&DOCKET[k].generated&&DOCKET[k].typeKey===typeKey()))DOCKET[k]=S.caseType==='random'?CASES[k]:builtinFor(k);}
+  if(G.i>=0&&G.phase!=='')prefetch(G.i+1);}}
+function typePicker(id){return `<div class="tpick"><label for="${id}">Next case</label><select id="${id}">${Object.entries(CASE_TYPES).map(([k,v])=>`<option value="${k}"${k===S.caseType?' selected':''}>${esc(v.label)}</option>`).join('')}</select>
+ <input type="text" id="${id}-c" placeholder="e.g. a hit-and-run outside a school, a pharmacist stealing opioids" value="${esc(S.caseCustom)}" ${S.caseType==='custom'?'':'hidden'}></div>`;}
+function wirePicker(id){const sel=$('#'+id),inp=$('#'+id+'-c');if(!sel)return;
+ sel.onchange=()=>{inp.hidden=sel.value!=='custom';if(sel.value==='custom')inp.focus();setCaseType(sel.value);};
+ inp.onchange=()=>setCaseType('custom',inp.value);
+ inp.addEventListener('keydown',e=>e.stopPropagation());}
+// start screen
+(function(){const go=$('#go');const row=go.closest('.row');row.insertAdjacentHTML('beforebegin',typePicker('tp-intro'));wirePicker('tp-intro');})();
+// case results screen + docket screen: add picker after render
+const _finish=finishCase;finishCase=function(){_finish.apply(this,arguments);const nx=$('#nx');if(nx&&G.i+1<DOCKET.length){nx.closest('.row').insertAdjacentHTML('beforebegin',typePicker('tp-res'));wirePicker('tp-res');}};
+$('#b-docket').addEventListener('click',()=>{const r=$('#dkc');if(r){r.closest('.row').insertAdjacentHTML('beforebegin',typePicker('tp-dk'));wirePicker('tp-dk');}});
 </script>
 </body></html>

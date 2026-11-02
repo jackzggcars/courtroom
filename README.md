@@ -10,6 +10,10 @@ A 3D US criminal courtroom game. You are the presiding judge of the Harlan Count
 
 With a Gemini key, Gemini drafts a brand-new case for each of the six docket slots (traffic, misdemeanors, criminal traffic, felony, homicide): the people, 5-8 detailed documents, pretrial motions, testimony, objections, the hidden truth, the correct verdict and sentencing guidelines. Each case is checked before it reaches the courtroom; if a draft is unusable, a standard case is used instead. Turn this off in Settings.
 
+## Choosing the case type
+
+On the start screen, after each case, and on the Docket screen, pick what the next case should be: **Random** (the usual mixed docket), a specific type (traffic ticket, theft, assault, domestic violence, DUI, drugs, burglary or robbery, fraud, weapons, homicide), or **Describe your own** and type the case you want. Specific types and your own descriptions are written by Gemini; without a key, the matching standard case is used where there is one.
+
 ## The bench file
 
 A 3D case file sits on the judge's bench. Click it, press **D**, or say "look down" to read it. Turn pages with the arrow keys, by clicking the page edges, or by saying "next page". Click a page or press Enter to read it full size.
