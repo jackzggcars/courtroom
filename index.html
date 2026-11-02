@@ -155,6 +155,23 @@ input[type=text],input[type=password],input[type=number],select{background:#120e
 .grade{float:right;font:700 64px/1 var(--disp);color:var(--brass2)}
 .why{background:var(--panel2);border-left:3px solid var(--brass);padding:8px 11px;margin:8px 0;font-size:13px;color:#d9ccb6}
 .why.bad{border-left-color:var(--bad)}
+.book{width:min(900px,100%)}
+.book h3{margin:18px 0 6px;font:500 21px/1.25 var(--disp);color:var(--brass2)}
+.book h4{margin:14px 0 6px}
+.say{display:inline-block;background:#2b2118;border:1px solid #5a4632;border-radius:3px;padding:1px 7px;margin:2px 2px;font:500 12.5px var(--body);color:var(--brass2);white-space:nowrap}
+.now{border:1px solid var(--brass);background:#2a2015;border-radius:3px;padding:8px 11px;margin:6px 0 4px}
+.now small{font:700 10.5px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--brass)}.now p{margin:4px 0 0}
+.tblw{overflow-x:auto}
+table.bk{width:100%;border-collapse:collapse;font-size:13px}
+table.bk td,table.bk th{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+table.bk th{font:600 10.5px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+table.bk td:first-child{font-weight:600;color:var(--brass2);white-space:nowrap}
+.bktabs{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+.bktabs button{background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:5px 10px;font:600 12px var(--body)}
+.bktabs button.on{border-color:var(--brass);color:var(--brass2)}
+.bkm{border:1px solid var(--line);border-radius:3px;padding:8px 10px;margin:6px 0;background:var(--panel2)}
+.bkm b{font-weight:600}.bkm p{margin:4px 0;font-size:13px;color:#d3c6b1}
+.book ul{padding-left:18px}.book li{margin:5px 0}
 @media (max-width:900px){
  #work{grid-template-columns:1fr;grid-template-rows:minmax(260px,48vh) minmax(0,1fr)}
  .sgrid{grid-template-columns:1fr}
@@ -173,6 +190,7 @@ input[type=text],input[type=password],input[type=number],select{background:#120e
   <div class="sp"></div>
   <span id="aistat">AI off</span>
   <button class="tb" id="b-docket">Docket</button>
+  <button class="tb" id="b-book">Bench book</button>
   <button class="tb" id="b-set">Settings</button>
  </header>
  <main id="work">
@@ -245,6 +263,8 @@ input[type=text],input[type=password],input[type=number],select{background:#120e
 
 <div class="ov" id="docov" hidden><div class="paper" id="paper"></div></div>
 <div class="ov" id="genov" hidden><div class="card" id="gencard"></div></div>
+
+<div class="ov" id="bookov" hidden><div class="card book"><button class="btn ghost" id="bookx" style="float:right;padding:6px 12px">Close</button><div class="sub">What you can say from the bench</div><h2>Bench book</h2><div id="bookbody"></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script>
 /* =====================================================================
    CASE FILES — Harlan County Circuit Court, Courtroom 4B
@@ -1024,11 +1044,12 @@ function openDoc(id){const c=C();const d=c.docs.find(x=>x.id===id);if(!d)return;
 /* ---------------- decisions */
 function decide(kind,title,text,opts,note){return new Promise(res=>{G.waiting=kind;updateNext();const d=$('#decide');
  d.innerHTML=`<small>${esc(kind)}</small><h3>${esc(title)}</h3>${text?`<p>${esc(text)}</p>`:''}<div class="opts">${opts.map((o,i)=>`<button data-i="${i}">${esc(o)}</button>`).join('')}</div>${note?`<div class="note">${esc(note)}</div>`:''}`;
- d.hidden=false;setSub();G.dOpts=opts;G.pick=i=>{d.hidden=true;G.waiting=null;G.pick=null;G.dOpts=null;updateNext();res(i);};d.querySelectorAll('button').forEach(b=>b.onclick=()=>G.pick&&G.pick(+b.dataset.i));});}
+ d.hidden=false;setSub();G.dOpts=opts;if(G.autoPick!=null||G.autoPickIndex!=null){const ai=G.autoPickIndex!=null?G.autoPickIndex:matchOption(G.autoPick,opts);G.autoPick=null;G.autoPickIndex=null;if(ai>=0&&ai<opts.length){setTimeout(()=>G.pick&&G.pick(ai),400);}}G.pick=i=>{d.hidden=true;G.waiting=null;G.pick=null;G.dOpts=null;updateNext();res(i);};d.querySelectorAll('button').forEach(b=>b.onclick=()=>G.pick&&G.pick(+b.dataset.i));});}
 
 /* ---------------- flow */
 async function run(fn){if(G.busy)return;G.busy=true;updateNext();try{await fn();}catch(e){console.error(e);sys('Something went wrong: '+e.message,'bad');}G.busy=false;updateNext();
- if(G.queued&&G.queued.length){const q=G.queued.shift();run(()=>respond(q.txt,q.to));}}
+ if(G.queued&&G.queued.length){const q=G.queued.shift();run(()=>respond(q.txt,q.to));return;}
+ if(G.pendingNext){G.pendingNext=false;setTimeout(nextClicked,50);}}
 function nextClicked(){ctx();
  if(G.phase===''||G.phase==='End'){return startCase(G.i+1);}
  if(G.phase==='Call')return run(doMotions);
@@ -1212,7 +1233,7 @@ function wire(){
  $('#i-name').value=S.name;$('#i-key').value=S.key;
  $('#go').onclick=()=>{S.name=$('#i-name').value.trim()||'Judge Hollis';S.key=$('#i-key').value.trim();saveS();aiStat();$('#intro').hidden=true;ctx();refreshPlate();startCase(0);};
  $('#go-set').onclick=()=>{S.name=$('#i-name').value.trim()||S.name;S.key=$('#i-key').value.trim();fillSettings();$('#setov').hidden=false;};
- $('#b-set').onclick=()=>{fillSettings();$('#setov').hidden=false;};
+ $('#b-book').onclick=()=>openBook();$('#b-set').onclick=()=>{fillSettings();$('#setov').hidden=false;};
  $('#s-close').onclick=()=>$('#setov').hidden=true;
  $('#s-save').onclick=()=>{readSettings();$('#setov').hidden=true;};
  $('#s-test').onclick=async()=>{readSettings();$('#s-err').textContent='Testing…';try{const t=await aiText('Reply with JSON {"ok":true}');$('#s-err').textContent='Dialogue works with '+S.model+'.';}catch(e){$('#s-err').textContent='Dialogue failed: '+String(e.message).slice(0,200);return;}
@@ -1221,7 +1242,7 @@ function wire(){
  $('#next').onclick=nextClicked;$('#send').onclick=()=>playerSay();
  $('#msg').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();playerSay();}});
  $('#gavel').onclick=()=>{gavel(2);if(G.phase&&G.busy)G.stop=true;};
- document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;if(e.key==='g'||e.key==='G')gavel(1);if(e.key==='Escape'){$('#docov').hidden=true;}});
+ document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;if(e.key==='g'||e.key==='G')gavel(1);if(e.key==='Escape'){$('#docov').hidden=true;$('#bookov').hidden=true;}if(e.key==='b'||e.key==='B')openBook();});
  $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.t);};
  $('#t-file').onclick=e=>{const d=e.target.closest('[data-doc]');if(d)openDoc(d.dataset.doc);const a=e.target.closest('[data-addr]');if(a){$('#to').value=a.dataset.addr;$('#msg').focus();}};
  $('#docov').onclick=e=>{if(e.target.id==='docov')$('#docov').hidden=true;};
@@ -1236,12 +1257,22 @@ aiStat();wire();initGL();setPhase('');renderFile();
 G.i=0;loadCast(CASES[0]);G.i=-1;
 
 /* ===================================================== push-to-talk + spoken commands */
-const norm=t=>t.toLowerCase().replace(/[^a-z0-9' ]+/g,' ').replace(/\s+/g,' ').trim();
-function matchOption(t,opts){const n=norm(t);
- const rules=[[/\bnot guilty\b|\bacquit/,o=>/^not guilty/i.test(o)],[/\bnot responsible\b|\bdismiss/,o=>/not responsible|dismiss/i.test(o)],[/\bmanslaughter\b/,o=>/manslaughter/i.test(o)],[/\breckless\b/,o=>/reckless/i.test(o)],[/\blesser\b/,o=>/lesser/i.test(o)],[/\bgrand theft only\b/,o=>/grand theft only/i.test(o)],
-  [/\bsustain/,o=>/^sustain/i.test(o)],[/\boverrul/,o=>/^overrul/i.test(o)],[/\bgrant/,o=>/^grant/i.test(o)],[/\bden(y|ied)\b/,o=>/^deny/i.test(o)],[/\bguilty\b|\bresponsible\b|\bconvict/,o=>/^(guilty|responsible)/i.test(o)]];
- for(const [re,f] of rules)if(re.test(n)){const i=opts.findIndex(f);if(i>=0)return i;}
- let best=-1,bs=0;opts.forEach((o,i)=>{const w=norm(o).split(' ').filter(x=>x.length>3);const sc=w.filter(x=>n.includes(x)).length/Math.max(1,w.length);if(sc>bs){bs=sc;best=i;}});return bs>=0.5?best:-1;}
+const norm=t=>(' '+t.toLowerCase().replace(/['’]/g,'').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ')+' ').replace(/\s+/g,' ').trim();
+const NUMW={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,fifteen:15,eighteen:18,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,ninety:90,hundred:100};
+function matchOption(t,opts){const n=' '+norm(t)+' ';const has=re=>re.test(n);
+ const find=f=>opts.findIndex(o=>f(o.toLowerCase()));
+ const tries=[
+  [/ not guilty | acquit| find (him|her|them) not /,o=>/^not guilty/.test(o)],
+  [/ not responsible | dismiss/,o=>/not responsible|dismiss/.test(o)],
+  [/ manslaughter /,o=>/manslaughter/.test(o)],[/ reckless /,o=>/reckless/.test(o)],[/ grand theft only | only grand theft | just (the )?grand theft /,o=>/grand theft only/.test(o)],
+  [/ lesser | 1 ?(to|-) ?9 | one to nine /,o=>/lesser/.test(o)],
+  [/ sustain| objection upheld | strike that | rephrase /,o=>/^sustain/.test(o)],
+  [/ overrul| ill allow it | allowed | you may answer | answer the question | go ahead and answer | objection denied /,o=>/^overrul/.test(o)],
+  [/ grant| suppress| exclude| excluded | thrown out | inadmissible | keep (it|that) out /,o=>/^(grant|sustain)/.test(o)||/suppress|exclude/.test(o)],
+  [/ den(y|ied) | admissible | admit (it|the)| comes in | can come in | allow the (evidence|statement|reading|prior)| motion fails /,o=>/^(deny|overrule)/.test(o)||/admi/.test(o)],
+  [/ guilty | responsible | convict/,o=>/^(guilty|responsible)/.test(o)]];
+ for(const [re,f] of tries)if(has(re)){const i=find(f);if(i>=0)return i;}
+ let best=-1,bs=0;opts.forEach((o,i)=>{const w=norm(o).split(' ').filter(x=>x.length>3);const sc=w.filter(x=>n.includes(' '+x+' ')).length/Math.max(1,w.length);if(sc>bs){bs=sc;best=i;}});return bs>=0.5?best:-1;}
 function findAddressee(t){const n=' '+norm(t)+' ';let hit=null,pos=1e9;
  Object.values(G.cast).forEach(p=>{if(p.hidden||p.seat==='none')return;const words=new Set();const nm=norm(p.name.replace(/,? esq\.?/i,'')).split(' ');words.add(nm[nm.length-1]);if(nm.length>1)words.add(nm[nm.length-2]);
   ({pros:['prosecutor','state','prosecution','ada'],def:['defense','counsel for the defense','mr feld'],dft:['defendant'],bailiff:['bailiff','deputy sorensen'],clerk:['clerk','madam clerk']})[p.id]?.forEach(w=>words.add(w));
@@ -1249,21 +1280,91 @@ function findAddressee(t){const n=' '+norm(t)+' ';let hit=null,pos=1e9;
   if(/officer|ofc/i.test(p.name))words.add('officer');if(/^det\./i.test(p.name))words.add('detective');if(/^dep\./i.test(p.name))words.add('deputy');if(/^dr\./i.test(p.name))words.add('doctor');
   words.forEach(w=>{if(w.length<3||w==='the')return;const i=n.indexOf(' '+w+' ');if(i>=0&&i<pos){pos=i;hit=p.id;}});});
  return hit;}
+/* what the next press of the main button does, by phase */
+function nextStep(){if(G.phase===''||G.phase==='End')return 'case';if(G.phase==='Call')return 'motions';if(G.phase==='Motions')return 'trial';if(G.phase==='Trial')return G.beat>=C().script.length?'closing':'continue';if(G.phase==='Closing')return 'closing';if(G.phase==='Verdict')return 'verdict';if(G.phase==='Sentence')return 'sentence';return 'continue';}
+const STAGE_WORDS={
+ case:/ (next|first|new) case | call the (next |first )?case | call the docket | begin | start | lets begin | lets start | court is in session /,
+ motions:/ motion| pretrial | pre trial | hear (the )?argument/,
+ trial:/ trial | first witness | call (your|the) (first )?witness | opening | evidence | begin testimony | start testimony | case in chief /,
+ continue:/ continue | next witness | next question | carry on | go on | keep going | proceed /,
+ closing:/ closing| closings | summation| final argument/,
+ verdict:/ verdict| ready to rule | deliver | my ruling | decision /,
+ sentence:/ sentenc| impose /};
+const ADVANCE=/ (proceed|continue|carry on|go ahead|go on|move on|move along|next|lets go|you may proceed|please proceed|lets hear|well hear|ill hear|i will hear|we will hear|hear the|call|bring|begin|start|lets do|ready|get on with) /;
+function stageIntent(n){const want=nextStep();const s=' '+n+' ';
+ const named=Object.keys(STAGE_WORDS).filter(k=>STAGE_WORDS[k].test(s));
+ if(named.includes(want))return want;
+ if(want==='closing'&&named.includes('continue'))return want;
+ if(want==='continue'&&named.includes('closing'))return 'skipclosing';
+ if(named.length===1&&named[0]==='continue')return want;
+ if(named.length&&(ADVANCE.test(s)||named.length))return {wrong:named[0],want};
+ if(ADVANCE.test(s)&&!/\?$/.test(n)&&n.split(' ').length<=6)return want;
+ return null;}
+const STAGE_NAME={case:'calling the next case',motions:'pretrial motions',trial:'the trial',continue:'continuing the testimony',closing:'closing arguments',verdict:'the verdict',sentence:'sentencing'};
+function sayHints(){const st=nextStep();const L={
+ case:['“Call the next case.”'],motions:['“Let’s hear the motions.”','“Proceed.”'],trial:['“Proceed to trial.”','“Call your first witness.”'],
+ continue:['“Continue.”','“Officer, did you pace the van?”','“Order in the court.”'],closing:['“Let’s hear closing arguments.”'],verdict:['“I’m ready to deliver the verdict.”','“Not guilty.”','“Guilty.”'],sentence:['“Twelve months probation and a 250 dollar fine.”','“Impose sentence.”']}[st]||['“Proceed.”'];
+ if(G.dOpts)return G.dOpts.slice(0,3).map(o=>'“'+o.split('—')[0].trim()+'.”');return L;}
+async function sayAgain(t){const hints=sayHints();
+ if(G.cast.clerk)await sayLite('clerk','I’m sorry, Your Honor, could you say that again?');
+ sys(`Not understood: “${t}”. Try ${hints.join(' or ')} The Bench book (B) lists everything you can say.`,'bad');}
+async function sayLite(id,text){const per=G.cast[id];if(!per)return;W.focus=id;const p=W.people[id];if(p)p.talk=1;setSub(per.name,text);addTx(per.name,text,'');await Voice.say(text,per);if(p)p.talk=0;setSub();}
+function doStage(st){if(st==='skipclosing'){G.beat=C().script.length;}
+ if(G.busy&&!G.waiting){G.stop=true;G.pendingNext=true;Voice.stop();return;}
+ if(G.waiting)return;nextClicked();}
 async function handleSpoken(t){
- t=t.trim();if(!t)return;const n=norm(t);
+ t=t.trim();if(!t)return;const n=norm(t);const s=' '+n+' ';
+ // 1. a decision is waiting: rule on it
  if(G.pick&&G.dOpts){const i=matchOption(t,G.dOpts);if(i>=0){judgeSays(t);G.pick(i);return;}}
- if($('#intro')&&!$('#intro').hidden){if(/\b(begin|start|take the bench|ready)\b/.test(n))$('#go').click();return;}
- if(!$('#genov').hidden){const nx=$('#nx');if(nx&&/\b(next|call|proceed|continue|close)\b/.test(n)){nx.click();return;}
-  const sg=$('#sgo');if(sg){voiceSentence(t);return;}}
- if(/^(gavel|order( order)?|order in the court)\b/.test(n)){gavel(3);if(G.busy)G.stop=true;judgeSays(t);return;}
- if(/^(hold on|wait|pause|stop|one moment)\b/.test(n)){G.stop=true;Voice.stop();judgeSays(t);sys('The court pauses.');return;}
- if(/^(proceed|continue|carry on|go ahead|go on|next|move on|let's (begin|proceed|continue|move on)|call (the )?next (case|witness)|hear (the )?motions|closing arguments|let's hear closing|i'?m ready (for|to deliver) (the )?verdict|deliver (the )?verdict|begin|you may proceed|please proceed)\b/.test(n)&&!G.busy&&!G.waiting){judgeSays(t);nextClicked();return;}
- if(/\b(open|show me|read)\b.*\b(file|document|report|log|record|certificate|transcript|statement|scoresheet|guide)\b/.test(n)){const c=C();if(c){let best=null,bs=0;c.docs.forEach(d=>{const w=norm(d.title+' '+d.kind).split(' ').filter(x=>x.length>3);const sc=w.filter(x=>n.includes(x)).length;if(sc>bs){bs=sc;best=d;}});if(best){openDoc(best.id);return;}tab('file');return;}}
- if(/^(close|close (the|that) (document|file))\b/.test(n)){$('#docov').hidden=true;return;}
- const to=findAddressee(t)||(G.onStand&&/\?$|^(did|do|were|was|what|why|how|when|where|who|is|are|can|could|tell)\b/.test(n)?G.onStand:null);
- if(to)$('#to').value=to;
- await playerSay(t,to||$('#to').value);
+ // 2. start screen / popups
+ if($('#intro')&&!$('#intro').hidden){if(/ (begin|start|take the bench|ready|go|lets go|enter) /.test(s))$('#go').click();return;}
+ if(!$('#bookov').hidden){if(/ (close|done|thank|back|exit) /.test(s))$('#bookov').hidden=true;return;}
+ if(!$('#docov').hidden&&/ (close|done|thank you|back|put (it|that) away) /.test(s)){$('#docov').hidden=true;return;}
+ if(!$('#genov').hidden){const nx=$('#nx');if(nx&&/ (next|call|proceed|continue|close|yes|go) /.test(s)){nx.click();return;}
+  if($('#sgo')){voiceSentence(t);return;}if(/ (close|done|ok|okay) /.test(s)){$('#genov').hidden=true;return;}}
+ // 3. global commands
+ if(/ (manual|bench ?book|help|what can i say|commands) /.test(s)){openBook();return;}
+ if(/^(gavel|order|order order|order in the court|silence|quiet)( |$)/.test(n)||/ order in (the|my) court(room)? /.test(s)){gavel(3);if(G.busy)G.stop=true;judgeSays(t);if(G.cast.bailiff)sayLite('bailiff','Order! Quiet in the courtroom.');return;}
+ if(/^(hold on|wait|pause|stop|one moment|just a moment|hang on)( |$)/.test(n)){G.stop=true;Voice.stop();judgeSays(t);sys('The court pauses. Say “continue” to resume.');return;}
+ if(/ (open|show|read|look at|pull up|let me see|see) /.test(s)&&/ (file|document|report|log|record|certificate|transcript|statement|scoresheet|guide|card|rule|ticket|citation|memo|affidavit|worksheet|extraction|autopsy|record|instruction|notes) /.test(s)){const c=C();if(c){let best=null,bs=0;c.docs.forEach(d=>{const w=norm(d.title+' '+d.kind).split(' ').filter(x=>x.length>3);const sc=w.filter(x=>s.includes(' '+x+' ')).length;if(sc>bs){bs=sc;best=d;}});if(best){openDoc(best.id);return;}tab('file');return;}}
+ if(/^(close|close (the|that) (document|file))( |$)/.test(n)){$('#docov').hidden=true;return;}
+ // 4. a ruling said aloud during the verdict phase opens the verdict and picks it
+ if(G.phase==='Verdict'&&!G.busy){const i=matchOption(t,C().verdicts.map(v=>v.label));if(i>=0){G.autoPick=t;judgeSays(t);nextClicked();return;}}
+ // 5. stage control
+ const addressed=findAddressee(t);
+ const st=addressed?null:stageIntent(n);
+ if(st&&typeof st==='string'){judgeSays(t);doStage(st);return;}
+ if(st&&st.wrong){judgeSays(t);if(!G.busy)await sayLite('clerk',`Very well, Your Honor. First, ${STAGE_NAME[st.want]||st.want}.`);doStage(st.want);return;}
+ // 6. speaking to someone
+ if(addressed){$('#to').value=addressed;return playerSay(t,addressed);}
+ const question=/\?$/.test(t)||/^(did|do|does|were|was|what|why|how|when|where|who|which|is|are|can|could|would|will|tell|describe|explain|walk me)( |$)/.test(n);
+ if(question&&G.onStand){$('#to').value=G.onStand;return playerSay(t,G.onStand);}
+ // 7. fallbacks: Gemini interprets, otherwise ask the judge to say it again
+ if(aiOn()){const ok=await aiIntent(t);if(ok)return;}
+ if(question||n.split(' ').length>=4){return playerSay(t,$('#to').value);}
+ await sayAgain(t);
 }
+async function aiIntent(t){
+ const c=C();$('#thinking').hidden=false;$('#thinking').textContent='The clerk is checking…';
+ const acts=[`"advance" (do the next step: ${STAGE_NAME[nextStep()]||'continue'})`];
+ if(G.dOpts)acts.push(`"rule" with "option" = index of one of: ${G.dOpts.map((o,i)=>i+': '+o).join(' | ')}`);
+ if(G.phase==='Verdict')acts.push(`"verdict" with "option" = index of: ${c.verdicts.map((v,i)=>i+': '+v.label).join(' | ')}`);
+ acts.push(`"doc" with "doc" = one of ${c?c.docs.map(d=>d.id+' ('+d.title+')').join(', '):''}`,'"speak" with "to" = a person id or "room" (the judge is talking to someone, not giving a procedural command)','"gavel"','"pause"','"manual"','"unclear"');
+ const people=Object.values(G.cast).filter(p=>!p.hidden&&p.seat!=='none').map(p=>`${p.id}=${p.name} (${p.role})`).join('; ');
+ try{const r=await aiText(`You interpret voice commands from the judge in a courtroom game. Speech recognition may have mangled words. Current phase: ${G.phase||'not started'}. ${G.onStand?'On the stand: '+G.cast[G.onStand].name+'.':''} People: ${people}.
+The judge said: "${t}"
+Choose ONE action: ${acts.join('; ')}.
+Return ONLY JSON like {"action":"advance"} or {"action":"rule","option":1} or {"action":"speak","to":"w1"} or {"action":"doc","doc":"radar"}.`);
+  $('#thinking').hidden=true;$('#thinking').textContent='Counsel is conferring…';const j=parseJSON(r);if(!j)return false;
+  if(j.action==='advance'){judgeSays(t);doStage(nextStep());return true;}
+  if(j.action==='rule'&&G.pick&&G.dOpts&&G.dOpts[j.option]!=null){judgeSays(t);G.pick(+j.option);return true;}
+  if(j.action==='verdict'&&G.phase==='Verdict'&&c.verdicts[j.option]){G.autoPickIndex=+j.option;judgeSays(t);nextClicked();return true;}
+  if(j.action==='doc'&&c&&c.docs.find(d=>d.id===j.doc)){openDoc(j.doc);return true;}
+  if(j.action==='gavel'){gavel(3);judgeSays(t);return true;}
+  if(j.action==='pause'){G.stop=true;Voice.stop();judgeSays(t);return true;}
+  if(j.action==='manual'){openBook();return true;}
+  if(j.action==='speak'){const to=G.cast[j.to]?j.to:'room';$('#to').value=to;playerSay(t,to);return true;}
+  return false;}catch(e){$('#thinking').hidden=true;$('#thinking').textContent='Counsel is conferring…';return false;}}
 function voiceSentence(t){const n=norm(t);const num=(re)=>{const m=n.match(re);return m?+m[1].replace(/,/g,''):null;};
  const j=num(/(\d+)\s*(day|month|year)/);if(j!=null&&$('#sj')){const unit=(n.match(/\d+\s*(day|month|year)/)||[])[1];const u=C().sentence.jailUnit;let v=j;if(unit==='year'&&u==='months')v=j*12;$('#sj').value=v;}
  const f=num(/\$?\s*([\d,]+)\s*(dollar|fine)|fine of \$?\s*([\d,]+)/);const fm=n.match(/fine (?:of )?\$?\s*([\d,]+)|([\d,]+) dollar/);if(fm&&$('#sf'))$('#sf').value=+(fm[1]||fm[2]).replace(/,/g,'');
@@ -1364,5 +1465,45 @@ async function toWav16(blob){
  w(0,'RIFF');bytes.setUint32(4,36+d.length*2,true);w(8,'WAVE');w(12,'fmt ');bytes.setUint32(16,16,true);bytes.setUint16(20,1,true);bytes.setUint16(22,1,true);bytes.setUint32(24,rate,true);bytes.setUint32(28,rate*2,true);bytes.setUint16(32,2,true);bytes.setUint16(34,16,true);w(36,'data');bytes.setUint32(40,d.length*2,true);
  for(let i=0;i<d.length;i++){const v=Math.max(-1,Math.min(1,d[i]));bytes.setInt16(44+i*2,v<0?v*0x8000:v*0x7fff,true);}
  const u8=new Uint8Array(bytes.buffer);let bin='';for(let i=0;i<u8.length;i+=0x8000)bin+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(bin);}
+
+/* ===================================================== bench book (manual) */
+const ASK={
+ okafor:{w1:['Officer Pike, did you pace the van?','Officer, when was the radar last calibrated?','Did you do the tuning fork checks that night?'],dft:['Mr. Okafor, how fast do you think you were going?','Why were you in such a hurry?'],pros:['Counsel, is there any other evidence of speed besides the radar?']},
+ brennan:{w1:['Mr. Pruitt, were any police present when you questioned her?','What exactly did you see on the aisle fourteen camera?','Did she remove the security tab?'],w2:['Officer Arroyo, did the defendant say anything to you?'],dft:['Ms. Brennan, why did you take off the security tab?','Did you intend to pay for the earbuds?']},
+ whitlock:{w1:['Mr. Delgado, did you pick up a bottle?','How many beers had you had?','Did you shove him first?'],w2:['Ms. Tran, how far away were you?','Who made the first contact?'],dft:['Mr. Whitlock, why did you throw the punch?']},
+ paxton:{w1:['Deputy, why did you stop the car?','When exactly did the twenty-minute observation start?','Was there a painted line for the walk-and-turn?'],dft:['Ms. Paxton, how much had you had to drink?']},
+ hale:{w1:['Detective, did Mr. Hale object to the search?','Did you have a warrant for the apartment?','How did you find the pawn record?'],w2:['Mr. Albright, were you wearing your glasses that evening?','How many photos were you shown?'],w3:['Doctor, can you tell when the print was left?','Which side of the window was the print on?'],dft:['Mr. Hale, where were you on September fourth?']},
+ varga:{w1:['Detective, did she ask for a lawyer?','Was the gun safe empty?','What was in her car trunk?'],w2:['Doctor, what were the injuries on her neck?','How far away was the gun when it fired?'],w3:['Ms. Shah, what did you hear that night?','Had you called the police about that house before?'],dft:['Ms. Varga, what happened in the kitchen?']}};
+function q(s){return '<span class="say">“'+esc(s)+'”</span>';}
+function openBook(which){
+ const cur=C();const idx=which!=null?which:(G.i>=0?G.i:0);const c=CASES[idx];
+ const now=G.phase&&G.phase!=='End'?`<div class="now"><small>Right now · ${esc(G.phase)}</small><p>${G.dOpts?'A ruling is waiting. Say one of: '+G.dOpts.map(o=>q(o.split('—')[0].trim())).join(' '):'Say '+sayHints().map(h=>'<span class="say">'+esc(h)+'</span>').join(' or ')}</p></div>`:'';
+ const stages=`<h3>Every trial, step by step</h3><div class="tblw"><table class="bk"><tr><th>Stage</th><th>What happens</th><th>Things you can say</th></tr>
+ <tr><td>Start</td><td>Court opens, the clerk calls the case.</td><td>${q('Call the next case')} ${q('Let’s begin')}</td></tr>
+ <tr><td>Call</td><td>Lawyers give appearances, the defendant pleads.</td><td>${q('Let’s hear the motions')} ${q('Proceed to motions')} ${q('Counsel, are we ready?')}</td></tr>
+ <tr><td>Motions</td><td>Each side argues a pretrial motion, then you rule.</td><td>${q('Motion granted')} ${q('Denied')} ${q('The evidence is suppressed')} ${q('It comes in')} ${q('Counsel, what case supports that?')} then ${q('Proceed to trial')}</td></tr>
+ <tr><td>Trial</td><td>Witnesses testify. Lawyers object; you rule.</td><td>${q('Continue')} ${q('Next witness')} ${q('Sustained')} ${q('Overruled')} ${q('I’ll allow it')} ${q('Strike that')} ${q('Officer, did you pace the van?')} ${q('Counsel, approach')}</td></tr>
+ <tr><td>Closing</td><td>Each side sums up.</td><td>${q('Let’s hear closing arguments')}</td></tr>
+ <tr><td>Verdict</td><td>You decide.</td><td>${q('I’m ready to deliver the verdict')} ${q('Not guilty')} ${q('Guilty')} ${q('Guilty of manslaughter')} ${q('Not responsible')}</td></tr>
+ <tr><td>Sentence</td><td>You set the penalty within the guidelines.</td><td>${q('Twelve months probation, a fine of 250 dollars, community service')} ${q('Thirty months in prison and restitution')} ${q('Impose sentence')}</td></tr>
+ <tr><td>Anytime</td><td></td><td>${q('Order in the court')} ${q('Wait')} ${q('Show me the calibration certificate')} ${q('Close')} ${q('Open the bench book')}</td></tr></table></div>
+ <p class="hint">To talk to someone, start with their name or role: ${q('Detective, ...')} ${q('Ms. Tran, ...')} ${q('Counsel for the State, ...')} ${q('Bailiff, ...')} ${q('Clerk, ...')}. A question with no name goes to whoever is on the witness stand. With a Gemini key on, anything else you say is interpreted for you; without one, the clerk asks you to repeat it.</p>`;
+ const tabs='<div class="bktabs">'+CASES.map((x,i)=>`<button data-bk="${i}" class="${i===idx?'on':''}">${i+1}. ${esc(x.title.replace('State v. ',''))}</button>`).join('')+'</div>';
+ const people=c.people.filter(p=>!p.hidden);
+ const motions=c.motions.map(m=>`<div class="bkm"><b>${esc(m.title)}</b><p>${esc(m.text)}</p><p>${m.options.map(o=>q(o.split('—')[0].trim())+' → '+esc(o.split('—')[1]||o)).join('<br>')}</p></div>`).join('');
+ const objs=c.script.filter(b=>b.obj).map(b=>`<li>${esc(b.obj.grounds)} — ${q('Sustained')} or ${q('Overruled')}</li>`).join('');
+ const asks=Object.entries(ASK[c.id]||{}).map(([id,arr])=>{const p=c.people.find(x=>x.id===id);return p?`<li><b>${esc(p.name)}</b> (${esc(p.role)}): ${arr.map(q).join(' ')}</li>`:'';}).join('');
+ const sent=c.sentence;const ex=(sent.extras||[]).map(e=>esc(e.label.split('(')[0].split('—')[0].trim().toLowerCase())).join(', ');
+ const cs=`<h3>${esc(c.title)} <span class="hint">${esc(c.docket)} · ${esc(c.short)}</span></h3>
+ <h4>Pretrial motions</h4>${motions}
+ <h4>Objections you will be asked to rule on</h4><ul>${objs||'<li>None scripted. Lawyers may still object when you question witnesses.</li>'}</ul>
+ <h4>Questions worth asking</h4><ul>${asks}</ul>
+ <h4>Verdict</h4><p>${c.verdicts.map(v=>q(v.label.split('—')[0].trim())).join(' ')}</p>
+ <h4>Sentencing (only after a guilty finding)</h4><p class="hint">${esc(sent.note||'')}</p><p>Say the numbers and any terms: ${ex?ex+'. ':''}${q(sent.kind==='felony'?'Thirty six months in state prison and restitution, impose sentence':sent.kind==='infraction'?'A fine of 200 dollars, impose sentence':'Nine months probation, a 250 dollar fine and community service, impose sentence')}</p>`;
+ $('#bookbody').innerHTML=now+stages+'<h3>Case by case</h3>'+tabs+cs;
+ $('#bookov').hidden=false;
+ $('#bookbody').querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>openBook(+b.dataset.bk));
+}
+$('#bookov').addEventListener('click',e=>{if(e.target.id==='bookov'||e.target.id==='bookx')$('#bookov').hidden=true;});
 </script>
 </body></html>
