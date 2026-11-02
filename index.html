@@ -1267,7 +1267,7 @@ const Mic={rec:null,on:false,buf:'',mode:null,media:null,chunks:[],
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(SR&&!this.srFailed){try{const r=new SR();this.rec=r;this.mode='sr';r.lang='en-US';r.continuous=true;r.interimResults=true;
     r.onresult=e=>{let fin='',int='';for(let i=0;i<e.results.length;i++){const x=e.results[i];(x.isFinal?(fin+=x[0].transcript+' '):(int+=x[0].transcript));}this.buf=fin;const show=(fin+int).trim();if(show)setSub(S.name+' (speaking)',show);};
-    r.onerror=e=>{if(/not-allowed|service-not-allowed|audio-capture/.test(e.error)){this.srFailed=true;this.blocked(e.error);}};
+    r.onerror=e=>{if(/not-allowed|service-not-allowed|audio-capture|network/.test(e.error)){this.srFailed=true;if(S.key){sys('Browser speech recognition is unavailable here ('+e.error+'). Switching to Gemini transcription: hold Space and speak again.');this.on=false;$('#mic').classList.remove('on');duck(false);setSub('Court reporter','Switched to Gemini transcription. Hold Space and speak again.');setTimeout(()=>setSub(),3500);}else this.blocked(e.error);}};
     r.onend=()=>{if(this.on&&this.mode==='sr'){try{r.start();}catch(_){}}};r.start();return;}catch(e){this.srFailed=true;}}
   if(S.key&&navigator.mediaDevices){try{const st=await navigator.mediaDevices.getUserMedia({audio:true});this.mode='rec';this.chunks=[];const mr=new MediaRecorder(st);this.media=mr;mr.ondataavailable=e=>e.data.size&&this.chunks.push(e.data);mr.start();return;}catch(e){this.blocked(e.name||'blocked');}}
   else this.blocked('no-api');},
@@ -1276,10 +1276,17 @@ const Mic={rec:null,on:false,buf:'',mode:null,media:null,chunks:[],
    const t=this.buf.trim();setSub();if(t)handleSpoken(t);else if(!this.srFailed)sys('The court reporter did not catch that. Hold Space and speak again.');return;}
   if(this.mode==='rec'&&this.media){const mr=this.media;this.media=null;this.mode=null;await new Promise(res=>{mr.onstop=res;mr.stop();});mr.stream.getTracks().forEach(t=>t.stop());
    const blob=new Blob(this.chunks,{type:mr.mimeType||'audio/webm'});setSub('Court reporter','Transcribing…');
-   try{const b64=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.readAsDataURL(blob);});
-    const ms=[...new Set([S.model,'gemini-3.8-flash','gemini-flash-latest','gemini-2.5-flash'])];let text='';
-    for(const m of ms){try{const j=await gpost('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{contents:[{parts:[{inline_data:{mime_type:(blob.type||'audio/webm').split(';')[0],data:b64}},{text:'Transcribe this English speech exactly. Output only the words spoken, nothing else.'}]}]},30000);text=(j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim();if(text)break;}catch(e){if(/401|403|API key/i.test(e.message))break;}}
-    setSub();if(text)handleSpoken(text);else sys('The court reporter did not catch that.','bad');}catch(e){setSub();sys('Transcription failed: '+e.message,'bad');}}
+   const fail=m=>{setSub('Court reporter',m);sys(m,'bad');setTimeout(()=>{if($('#sub').textContent.includes(m))setSub();},5000);};
+   if(blob.size<800){fail('No audio was recorded. Check that the right microphone is selected in your browser.');return;}
+   try{const b64=await toWav16(blob);
+    const ms=[...new Set([S.model,'gemini-3.8-flash','gemini-flash-latest','gemini-2.5-flash'])];let text='',err='';const t0=Date.now();
+    for(const m of ms){if(Date.now()-t0>20000)break;
+     try{const j=await gpost('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{contents:[{parts:[{inline_data:{mime_type:'audio/wav',data:b64}},{text:'Transcribe this English speech exactly. Output only the words spoken, nothing else. If there is no speech, output nothing.'}]}],generationConfig:{temperature:0}},12000);
+      text=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('').trim();if(text)break;err='no words heard';}
+     catch(e){err=String(e.message||e).slice(0,160);if(/401|403|API key/i.test(err))break;}}
+    if(text){setSub(S.name,text);setTimeout(()=>setSub(),1500);handleSpoken(text);}
+    else fail('Could not transcribe ('+(err||'no answer')+'). Try again, or open the game from GitHub Pages so your browser can recognise speech itself.');
+   }catch(e){fail('Transcription failed: '+String(e.message||e).slice(0,140));}}
   else setSub();},
  blocked(why){this.on=false;$('#mic').classList.remove('on');duck(false);setSub();
   sys('The microphone is blocked in this view ('+why+'). Open the downloadable copy of Courtroom 4B in Chrome or Edge to speak from the bench; typing still works here.','bad');}
@@ -1300,5 +1307,17 @@ async function requestMic(){if(micAsked||!navigator.mediaDevices||!navigator.med
  try{const st=await navigator.mediaDevices.getUserMedia({audio:true});st.getTracks().forEach(t=>t.stop());Mic.granted=true;}
  catch(e){micAsked=false;}}
 $('#go').addEventListener('click',()=>requestMic());
+
+/* convert a recording to 16 kHz mono WAV (a format Gemini accepts) and return base64 */
+async function toWav16(blob){
+ const ab=await blob.arrayBuffer();const c=new (window.AudioContext||window.webkitAudioContext)();
+ let buf;try{buf=await c.decodeAudioData(ab.slice(0));}finally{try{c.close();}catch(e){}}
+ const rate=16000,len=Math.max(1,Math.ceil(buf.duration*rate));const off=new OfflineAudioContext(1,len,rate);
+ const src=off.createBufferSource();src.buffer=buf;src.connect(off.destination);src.start();const out=await off.startRendering();
+ const d=out.getChannelData(0);const bytes=new DataView(new ArrayBuffer(44+d.length*2));
+ const w=(o,str)=>{for(let i=0;i<str.length;i++)bytes.setUint8(o+i,str.charCodeAt(i));};
+ w(0,'RIFF');bytes.setUint32(4,36+d.length*2,true);w(8,'WAVE');w(12,'fmt ');bytes.setUint32(16,16,true);bytes.setUint16(20,1,true);bytes.setUint16(22,1,true);bytes.setUint32(24,rate,true);bytes.setUint32(28,rate*2,true);bytes.setUint16(32,2,true);bytes.setUint16(34,16,true);w(36,'data');bytes.setUint32(40,d.length*2,true);
+ for(let i=0;i<d.length;i++){const v=Math.max(-1,Math.min(1,d[i]));bytes.setInt16(44+i*2,v<0?v*0x8000:v*0x7fff,true);}
+ const u8=new Uint8Array(bytes.buffer);let bin='';for(let i=0;i<u8.length;i+=0x8000)bin+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(bin);}
 </script>
 </body></html>
