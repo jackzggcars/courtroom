@@ -45,6 +45,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #vtools{position:absolute;right:10px;top:10px;display:flex;gap:5px}
 #vtools button{background:rgba(20,16,13,.84);border:1px solid var(--line);border-radius:3px;padding:4px 9px;font:600 11px var(--body)}
 #vtools button.on{border-color:var(--brass);color:var(--brass2)}
+#benchhint{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);max-width:calc(100% - 24px);background:rgba(20,16,13,.88);border:1px solid var(--brass);color:var(--brass2);font:600 11.5px var(--body);padding:4px 10px;border-radius:12px;text-align:center}
 #sub{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:min(760px,calc(100% - 24px));text-align:center;pointer-events:none}
 #sub div{display:inline-block;background:rgba(12,9,7,.86);border-radius:4px;padding:8px 14px;font:500 15.5px/1.4 var(--body);text-wrap:balance}
 #sub div b{display:block;font:600 10.5px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin-bottom:2px}
@@ -201,7 +202,8 @@ table.bk td:first-child{font-weight:600;color:var(--brass2);white-space:nowrap}
    <canvas id="gl"></canvas>
    <div id="labels"></div>
    <div id="caseplate"><b id="cp-title">Courtroom 4B</b><span id="cp-sub">Court is not in session</span><div id="phases"></div></div>
-   <div id="vtools"><button id="v-follow" class="on" title="Turn toward whoever is speaking">Follow speaker</button><button id="v-reset">Re-center</button></div>
+   <div id="vtools"><button id="v-file" title="Look down at the case file on your bench (D)">Bench file</button><button id="v-follow" class="on" title="Turn toward whoever is speaking">Follow speaker</button><button id="v-reset">Re-center</button></div>
+   <div id="benchhint" hidden>Bench file · click the right page or press → to turn · ← back · click the text or Enter to read full size · D or “look up” to return</div>
    <div id="sub"></div>
    <div id="decide" hidden></div>
    <div id="thinking" hidden>Counsel is conferring…</div>
@@ -239,7 +241,7 @@ table.bk td:first-child{font-weight:600;color:var(--brass2);white-space:nowrap}
    <label class="wide">Your name on the bench<input type="text" id="i-name" value="Judge Hollis" maxlength="40"></label>
    <label class="wide">Gemini API key (optional)<input type="password" id="i-key" placeholder="Paste a key from Google AI Studio" autocomplete="off"></label>
   </div>
-  <p class="hint">The key stays in this browser and is sent only to Google's Gemini API. Without one, the trial runs from its written script, and characters give short stock replies to your questions.</p>
+  <p class="hint">The key stays in this browser and is sent only to Google's Gemini API. With a key, Gemini writes a brand-new case for each slot on the docket, so no two sessions are the same. Without one, you get the six standard cases and characters give short stock replies.</p>
   <p class="hint">When you take the bench, your browser will ask to use the microphone. Choose <b>Allow</b> so you can speak to the court.</p>
   <div class="row"><button class="btn" id="go">Take the bench</button><button class="btn ghost" id="go-set">More settings</button></div>
  </div>
@@ -254,6 +256,7 @@ table.bk td:first-child{font-weight:600;color:var(--brass2);white-space:nowrap}
    <label>Dialogue model<input type="text" id="s-model" placeholder="gemini-3.8-flash"></label>
    <label>Voice model<input type="text" id="s-tts" placeholder="gemini-3.8-flash-tts"></label>
    <label class="chk wide"><input type="checkbox" id="s-ai">Characters improvise with Gemini</label>
+   <label class="chk wide"><input type="checkbox" id="s-gen">Gemini writes a brand-new case for every slot on the docket</label>
    <label class="chk wide"><input type="checkbox" id="s-voice">Speak lines aloud</label>
    <label class="chk wide"><input type="checkbox" id="s-gvoice">Use Gemini voices (falls back to browser voices)</label>
    <label class="chk wide"><input type="checkbox" id="s-auto">Proceedings continue automatically until a ruling is needed</label>
@@ -684,6 +687,7 @@ const CASES=[
 }
 ];
 'use strict';
+let DOCKET=CASES.slice();
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -691,7 +695,7 @@ const rnd=(a,b)=>a+Math.random()*(b-a);
 const GUILTY=new Set(['g','resp','lesser','gt','man','reck']);
 
 /* ===================================================== settings */
-const S={name:'Judge Hollis',key:'',model:'gemini-3.8-flash',tts:'gemini-3.8-flash-tts',ai:true,voice:true,gvoice:true,auto:true,vol:85,pace:1};
+const S={gen:true,name:'Judge Hollis',key:'',model:'gemini-3.8-flash',tts:'gemini-3.8-flash-tts',ai:true,voice:true,gvoice:true,auto:true,vol:85,pace:1};
 try{Object.assign(S,JSON.parse(localStorage.getItem('court4b.set')||'{}'));}catch(e){}
 function saveS(){try{localStorage.setItem('court4b.set',JSON.stringify(S));}catch(e){}}
 const aiOn=()=>!!(S.ai&&S.key);
@@ -756,11 +760,11 @@ async function listModels(){
   const score=n=>ver(n)*10+(/flash/.test(n)?3:0)-(/lite/.test(n)?2:0)-(/preview/.test(n)?0.5:0)+(/pro/.test(n)?-1:0);
   MODELS=names.sort((a,b)=>score(b)-score(a));}catch(e){MODELS=[];}
  return MODELS;}
-async function aiText(prompt){
+async function aiText(prompt,ms0,temp){
  const avail=await listModels();
  const ms=[...new Set([avail.includes(S.model)?S.model:null,...avail.slice(0,4),avail.length?null:S.model].filter(Boolean))];let last=null;
  for(const m of ms){
-  try{const j=await gpost('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.85,responseMimeType:'application/json'}},40000);
+  try{const j=await gpost('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:temp||0.85,responseMimeType:'application/json'}},ms0||40000);
    const t=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[]).map(p=>p.text||'').join('');
    if(t){if(m!==S.model){S.model=m;saveS();}aiStat();return t;}last=new Error('Empty reply');
   }catch(e){last=e;if(/API key|401|403|PERMISSION/i.test(String(e.message)))break;}
@@ -789,10 +793,11 @@ function initGL(){
  buildRoom();
  const ro=new ResizeObserver(resize);ro.observe($('#stage'));resize();
  // drag to look
- let drag=null;cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw:W.look.yaw,pitch:W.look.pitch};cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
- cv.addEventListener('pointermove',e=>{if(!drag)return;W.look.yaw=Math.max(-1.25,Math.min(1.25,drag.yaw-(e.clientX-drag.x)*0.004));W.look.pitch=Math.max(-0.7,Math.min(0.35,drag.pitch-(e.clientY-drag.y)*0.004));W.manual=performance.now();});
+ let drag=null;cv.addEventListener('pointerdown',e=>{W.dragMoved=false;drag={x:e.clientX,y:e.clientY,yaw:W.look.yaw,pitch:W.look.pitch};cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
+ cv.addEventListener('pointermove',e=>{if(!drag)return;if(Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)>6){W.dragMoved=true;if(typeof Bench!=='undefined'&&Bench.on)lookDown(false);}W.look.yaw=Math.max(-1.25,Math.min(1.25,drag.yaw-(e.clientX-drag.x)*0.004));W.look.pitch=Math.max(-0.7,Math.min(0.35,drag.pitch-(e.clientY-drag.y)*0.004));W.manual=performance.now();});
  const up=()=>{drag=null;cv.style.cursor='grab';};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
- cv.addEventListener('wheel',e=>{e.preventDefault();cam.fov=Math.max(30,Math.min(70,cam.fov+e.deltaY*0.03));cam.updateProjectionMatrix();},{passive:false});
+ cv.addEventListener('wheel',e=>{e.preventDefault();W.fovBase=Math.max(30,Math.min(70,(W.fovBase||58)+e.deltaY*0.03));},{passive:false});
+ buildBenchFile();
  requestAnimationFrame(loop);
 }
 function resize(){if(!R)return;const el=$('#stage');const w=el.clientWidth,h=el.clientHeight;R.setSize(w,h,false);cam.aspect=w/Math.max(1,h);cam.updateProjectionMatrix();}
@@ -967,7 +972,9 @@ function loop(){
  W.spect.forEach(p=>{p.lookAt=speaker?headPos(speaker):null;updatePerson(p,dt,t);});
  // camera
  let yaw=W.look.yaw,pitch=W.look.pitch;
- if(W.follow&&speaker&&(!W.manual||performance.now()-W.manual>4000)){const hp=headPos(speaker);const d=new THREE.Vector3().subVectors(hp,cam.position);yaw=Math.atan2(-d.x,d.z)*0.9;pitch=Math.atan2(d.y,Math.hypot(d.x,d.z))*0.85;W.look.yaw+=(yaw-W.look.yaw)*Math.min(1,dt*2.2);W.look.pitch+=(pitch-W.look.pitch)*Math.min(1,dt*2.2);}
+ if(W.follow&&speaker&&!(typeof Bench!=='undefined'&&Bench.on)&&(!W.manual||performance.now()-W.manual>4000)){const hp=headPos(speaker);const d=new THREE.Vector3().subVectors(hp,cam.position);yaw=Math.atan2(-d.x,d.z)*0.9;pitch=Math.atan2(d.y,Math.hypot(d.x,d.z))*0.85;W.look.yaw+=(yaw-W.look.yaw)*Math.min(1,dt*2.2);W.look.pitch+=(pitch-W.look.pitch)*Math.min(1,dt*2.2);}
+ if(typeof Bench!=='undefined'){animBench(dt);const tf=Bench.on?33:(W.fovBase||58);if(Math.abs(cam.fov-tf)>0.05){cam.fov+=(tf-cam.fov)*Math.min(1,dt*4);cam.updateProjectionMatrix();}
+  if(Bench.on&&Bench.group){const tp=new THREE.Vector3();Bench.group.getWorldPosition(tp);const d=tp.sub(cam.position);const ty=Math.atan2(-d.x,d.z),tpitch=Math.atan2(d.y,Math.hypot(d.x,d.z));W.look.yaw+=(ty-W.look.yaw)*Math.min(1,dt*4);W.look.pitch+=(tpitch-W.look.pitch)*Math.min(1,dt*4);}}
  const dir=new THREE.Vector3(-Math.sin(W.look.yaw)*Math.cos(W.look.pitch),Math.sin(W.look.pitch),Math.cos(W.look.yaw)*Math.cos(W.look.pitch));
  cam.position.y=2.95+Math.sin(t*0.5)*0.004;cam.lookAt(cam.position.clone().add(dir));
  // gavel anim
@@ -987,7 +994,7 @@ function shortRole(p){return ({pros:'State',def:'Defense',dft:'Defendant',clerk:
 /* ===================================================== game state */
 const G={i:-1,phase:'',cast:{},tx:[],rulings:{},objs:[],busy:false,beat:0,done:[],paused:false,excluded:new Set(),career:{score:0,cases:0,rev:0,appr:60},waiting:null};
 const PHASES=['Call','Motions','Trial','Closing','Verdict','Sentence'];
-const C=()=>CASES[G.i];
+const C=()=>DOCKET[G.i];
 
 function addTx(who,text,cls){G.tx.push({who,text,cls});const d=document.createElement('div');d.className='ln '+(cls||'');d.innerHTML=(who?`<b>${esc(who)}</b>`:'')+esc(text);$('#tx').appendChild(d);d.scrollIntoView({block:'end'});}
 function setSub(name,text){const s=$('#sub');if(!text){s.innerHTML='';return;}s.innerHTML=`<div><b>${esc(name)}</b>${esc(text)}</div>`;}
@@ -1064,10 +1071,13 @@ function nextClicked(){ctx();
  if(G.phase==='Sentence')return run(doSentence);
 }
 async function startCase(i){
- if(i>=CASES.length){return endDay();}
+ if(i>=DOCKET.length){return endDay();}
+ if(S.gen&&aiOn()&&!(DOCKET[i]&&DOCKET[i].generated)){
+  const ok=await prepareCase(i,true);if(!ok)sys('Gemini could not draft a new case, so the court is using a case from the standard docket.','bad');}
+ prefetch(i+1);
  G.i=i;bookCase=null;G.rulings={};G.objs=[];G.beat=0;G.excluded=new Set();G.verdict=null;G.sent=null;G.aiObjs=0;G.onStand=null;$('#tx').innerHTML='';G.tx=[];
- const c=C();loadCast(c);renderFile();renderRulings();tab('file');
- $('#cp-title').textContent=c.title;$('#cp-sub').textContent=`${c.docket} · ${c.tier}`;$('#s-docket').textContent=`${i+1} / ${CASES.length}`;
+ const c=C();loadCast(c);renderFile();renderRulings();tab('file');Bench.page=0;renderBench();
+ $('#cp-title').textContent=c.title;$('#cp-sub').textContent=`${c.docket} · ${c.tier}`;$('#s-docket').textContent=`${i+1} / ${DOCKET.length}`;
  setPhase('Call');
  run(async()=>{
   await sleep(500);await say('bailiff','All rise. Courtroom 4B is now in session, the Honorable '+S.name+' presiding.');gavel(1);
@@ -1090,7 +1100,7 @@ async function doMotions(){
   const r=await decide('Ruling on motion',m.title,m.text,m.options,'Open the case file to check the documents before you rule. You can also question counsel first, then rule.');
   G.rulings[m.id]=r;judgeSays(`On the ${m.title.toLowerCase()}: ${m.options[r].split('—')[0].trim()}.`);gavel(1);
   const granted=/^(Grant|Sustain)/.test(m.options[r]);if(granted&&m.excl)m.excl.forEach(x=>G.excluded.add(x));
-  renderRulings();renderFile();
+  renderRulings();renderFile();renderBench();
   await say('clerk','So noted for the record.');
  }
  sys('All motions ruled. Proceed to trial when ready.');
@@ -1172,12 +1182,12 @@ function finishCase(){
  ${rev?`<p><b style="color:var(--bad)">${rev} ruling${rev>1?'s':''} reversible on appeal.</b></p>`:'<p style="color:var(--ok)">No reversible error. The appellate court affirms.</p>'}
  ${notes.map(n=>`<div class="why${n.bad?' bad':''}">${esc(n.t)}</div>`).join('')}
  <details><summary class="hint">What really happened</summary><p class="hint">${esc(c.truth)}</p></details>
- <div class="row"><button class="btn" id="nx">${G.i+1<CASES.length?'Call the next case':'Close the docket'}</button><button class="btn ghost" id="stay">Stay in this courtroom</button></div>`;
+ <div class="row"><button class="btn" id="nx">${G.i+1<DOCKET.length?'Call the next case':'Close the docket'}</button><button class="btn ghost" id="stay">Stay in this courtroom</button></div>`;
  $('#genov').hidden=false;setPhase('End');
  $('#nx').onclick=()=>{$('#genov').hidden=true;startCase(G.i+1);};$('#stay').onclick=()=>{$('#genov').hidden=true;};
 }
 function endDay(){const avg=G.career.cases?Math.round(G.career.score/G.career.cases):0;
- $('#gencard').innerHTML=`<div class="sub">End of docket</div><h2>Court is adjourned.</h2><div class="res">${CASES.map((c,i)=>`<div><span>${esc(c.title)}</span><b>${G.done[i]?G.done[i].grade+' · '+G.done[i].total:'—'}</b></div>`).join('')}<div><span><b>Average</b></span><b>${avg}</b></div><div><span>Reversals</span><b>${G.career.rev}</b></div><div><span>Public approval</span><b>${G.career.appr}%</b></div></div>
+ $('#gencard').innerHTML=`<div class="sub">End of docket</div><h2>Court is adjourned.</h2><div class="res">${DOCKET.map((c,i)=>`<div><span>${esc(c.title)}</span><b>${G.done[i]?G.done[i].grade+' · '+G.done[i].total:'—'}</b></div>`).join('')}<div><span><b>Average</b></span><b>${avg}</b></div><div><span>Reversals</span><b>${G.career.rev}</b></div><div><span>Public approval</span><b>${G.career.appr}%</b></div></div>
  <p>${avg>=85?'The Chief Judge is recommending you for the appellate bench.':avg>=65?'A solid day. The court of appeals will have little to say.':'The local paper is running an editorial about your courtroom.'}</p><div class="row"><button class="btn" id="again">Start a new docket</button></div>`;
  $('#genov').hidden=false;setPhase('End');$('#again').onclick=()=>{G.done=[];G.career={score:0,cases:0,rev:0,appr:60};$('#genov').hidden=true;startCase(0);};}
 function gavel(n){gavelSound(n);if(W.gavel)W.gavelT=0.25*n;}
@@ -1231,8 +1241,8 @@ Return ONLY JSON: {"lines":[{"speaker":"<id>","text":"<spoken words>"}],"objecti
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 
 /* ---------------- UI wiring */
-function fillSettings(){$('#s-key').value=S.key;$('#s-model').value=S.model;$('#s-tts').value=S.tts;$('#s-ai').checked=S.ai;$('#s-voice').checked=S.voice;$('#s-gvoice').checked=S.gvoice;$('#s-auto').checked=S.auto;$('#s-vol').value=S.vol;$('#s-pace').value=String(S.pace);$('#s-err').textContent='';}
-function readSettings(){if($('#s-key').value.trim()!==S.key)MODELS=null;S.key=$('#s-key').value.trim();S.model=$('#s-model').value.trim()||'gemini-3.8-flash';S.tts=$('#s-tts').value.trim()||'gemini-3.8-flash-tts';S.ai=$('#s-ai').checked;S.voice=$('#s-voice').checked;S.gvoice=$('#s-gvoice').checked;S.auto=$('#s-auto').checked;S.vol=Math.max(0,Math.min(100,+$('#s-vol').value||85));S.pace=+$('#s-pace').value||1;saveS();aiStat();Voice.fails=0;}
+function fillSettings(){$('#s-key').value=S.key;$('#s-model').value=S.model;$('#s-tts').value=S.tts;$('#s-ai').checked=S.ai;$('#s-gen').checked=S.gen;$('#s-voice').checked=S.voice;$('#s-gvoice').checked=S.gvoice;$('#s-auto').checked=S.auto;$('#s-vol').value=S.vol;$('#s-pace').value=String(S.pace);$('#s-err').textContent='';}
+function readSettings(){if($('#s-key').value.trim()!==S.key)MODELS=null;S.key=$('#s-key').value.trim();S.model=$('#s-model').value.trim()||'gemini-3.8-flash';S.tts=$('#s-tts').value.trim()||'gemini-3.8-flash-tts';S.ai=$('#s-ai').checked;S.gen=$('#s-gen').checked;S.voice=$('#s-voice').checked;S.gvoice=$('#s-gvoice').checked;S.auto=$('#s-auto').checked;S.vol=Math.max(0,Math.min(100,+$('#s-vol').value||85));S.pace=+$('#s-pace').value||1;saveS();aiStat();Voice.fails=0;}
 function wire(){
  $('#i-name').value=S.name;$('#i-key').value=S.key;
  $('#go').onclick=()=>{S.name=$('#i-name').value.trim()||'Judge Hollis';S.key=$('#i-key').value.trim();saveS();aiStat();$('#intro').hidden=true;ctx();refreshPlate();startCase(0);};
@@ -1242,23 +1252,20 @@ function wire(){
  $('#s-save').onclick=()=>{readSettings();$('#setov').hidden=true;};
  $('#s-test').onclick=async()=>{readSettings();$('#s-err').textContent='Testing…';try{const t=await aiText('Reply with JSON {"ok":true}');$('#s-err').textContent='Dialogue works with '+S.model+'.';}catch(e){$('#s-err').textContent='Dialogue failed: '+String(e.message).slice(0,200);return;}
   try{await Voice.gemini('The court is now in session.',STAFF.bailiff);$('#s-err').textContent+=' Voices work with '+S.tts+'.';}catch(e){$('#s-err').textContent+=' Voices failed ('+String(e.message).slice(0,120)+'); browser voices will be used.';}};
- $('#b-docket').onclick=()=>{$('#gencard').innerHTML=`<div class="sub">Today's calendar</div><h2>Docket — Courtroom 4B</h2><div class="docket">${CASES.map((c,i)=>`<div class="dk${G.done[i]?' done':''}"><i>${i+1}</i><div><b>${esc(c.title)}</b><br><span>${esc(c.short)} · ${esc(c.docket)}</span></div><em>${G.done[i]?G.done[i].grade:i===G.i?'Now':c.tier.split(' ')[0]}</em></div>`).join('')}</div><div class="row"><button class="btn" id="dkc">Close</button></div>`;$('#genov').hidden=false;$('#dkc').onclick=()=>$('#genov').hidden=true;};
+ $('#b-docket').onclick=()=>{$('#gencard').innerHTML=`<div class="sub">Today's calendar</div><h2>Docket — Courtroom 4B</h2><div class="docket">${DOCKET.map((c,i)=>`<div class="dk${G.done[i]?' done':''}"><i>${i+1}</i><div><b>${esc(c.title)}</b><br><span>${esc(c.short)} · ${esc(c.docket)}</span></div><em>${G.done[i]?G.done[i].grade:i===G.i?'Now':c.tier.split(' ')[0]}</em></div>`).join('')}</div><div class="row"><button class="btn" id="dkc">Close</button></div>`;$('#genov').hidden=false;$('#dkc').onclick=()=>$('#genov').hidden=true;};
  $('#next').onclick=nextClicked;$('#send').onclick=()=>playerSay();
  $('#msg').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();playerSay();}});
  $('#gavel').onclick=()=>{gavel(2);if(G.phase&&G.busy)G.stop=true;};
- document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;if(e.key==='g'||e.key==='G')gavel(1);if(e.key==='Escape'){$('#docov').hidden=true;$('#bookov').hidden=true;}if(e.key==='b'||e.key==='B')openBook();});
+ document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;if(e.key==='g'||e.key==='G')gavel(1);if(e.key==='Escape'){$('#docov').hidden=true;$('#bookov').hidden=true;}if(e.key==='b'||e.key==='B')openBook();if(e.key==='d'||e.key==='D')lookDown(!Bench.on);if(Bench.on&&e.key==='ArrowRight')turnPage(1);if(Bench.on&&e.key==='ArrowLeft')turnPage(-1);if(Bench.on&&e.key==='Enter')openBenchFull();});
  $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)tab(b.dataset.t);};
  $('#t-file').onclick=e=>{const d=e.target.closest('[data-doc]');if(d)openDoc(d.dataset.doc);const a=e.target.closest('[data-addr]');if(a){$('#to').value=a.dataset.addr;$('#msg').focus();}};
  $('#docov').onclick=e=>{if(e.target.id==='docov')$('#docov').hidden=true;};
- $('#v-follow').onclick=e=>{W.follow=!W.follow;e.target.classList.toggle('on',W.follow);};
- $('#v-reset').onclick=()=>{W.look.yaw=0;W.look.pitch=-0.12;W.manual=performance.now();if(cam){cam.fov=58;cam.updateProjectionMatrix();}};
+ $('#v-file').onclick=()=>lookDown(!Bench.on);$('#v-follow').onclick=e=>{W.follow=!W.follow;e.target.classList.toggle('on',W.follow);};
+ $('#v-reset').onclick=()=>{W.look.yaw=0;W.look.pitch=-0.12;W.manual=performance.now();W.fovBase=58;lookDown(false);};
  W.showNames=true;
  if('speechSynthesis' in window)speechSynthesis.onvoiceschanged=()=>{};
 }
 function refreshPlate(){if(!W.nameplate)return;const old=W.nameplate.material.map;W.nameplate.material.map=canvasTex(512,80,(g,w,h)=>{g.fillStyle='#b8933d';g.fillRect(0,0,w,h);g.fillStyle='#1f1505';g.font='700 38px Georgia';g.textAlign='center';g.textBaseline='middle';g.fillText(S.name.toUpperCase(),w/2,h/2+2);});W.nameplate.material.needsUpdate=true;old&&old.dispose();}
-aiStat();wire();initGL();setPhase('');renderFile();
-// preview cast so the room is populated behind the intro
-G.i=0;loadCast(CASES[0]);G.i=-1;
 
 /* ===================================================== push-to-talk + spoken commands */
 const norm=t=>(' '+t.toLowerCase().replace(/['’]/g,'').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ')+' ').replace(/\s+/g,' ').trim();
@@ -1330,7 +1337,11 @@ async function handleSpoken(t){
  if(/ (manual|bench ?book|help|what can i say|commands) /.test(s)){openBook();return;}
  if(/^(gavel|order|order order|order in the court|silence|quiet)( |$)/.test(n)||/ order in (the|my) court(room)? /.test(s)){gavel(3);if(G.busy)G.stop=true;judgeSays(t);if(G.cast.bailiff)sayLite('bailiff','Order! Quiet in the courtroom.');return;}
  if(/^(hold on|wait|pause|stop|one moment|just a moment|hang on)( |$)/.test(n)){G.stop=true;Voice.stop();judgeSays(t);sys('The court pauses. Say “continue” to resume.');return;}
- if(/ (open|show|read|look at|pull up|let me see|see) /.test(s)&&/ (file|document|report|log|record|certificate|transcript|statement|scoresheet|guide|card|rule|ticket|citation|memo|affidavit|worksheet|extraction|autopsy|record|instruction|notes) /.test(s)){const c=C();if(c){let best=null,bs=0;c.docs.forEach(d=>{const w=norm(d.title+' '+d.kind).split(' ').filter(x=>x.length>3);const sc=w.filter(x=>s.includes(' '+x+' ')).length;if(sc>bs){bs=sc;best=d;}});if(best){openDoc(best.id);return;}tab('file');return;}}
+ if(/ (next page|turn the page|page forward|flip|turn page) /.test(s)){if(!Bench.on)lookDown(true);turnPage(1);return;}
+ if(/ (previous page|last page|go back a page|page back|back a page) /.test(s)){if(!Bench.on)lookDown(true);turnPage(-1);return;}
+ if(/ (look down|bench file|case file on the bench|my file|look at (the|my) (file|papers|folder)) /.test(s)){lookDown(true);return;}
+ if(/ (look up|eyes up|back to the (room|court)|put (the )?file (down|away)) /.test(s)){lookDown(false);return;}
+ if(/ (open|show|read|look at|pull up|let me see|see) /.test(s)&&/ (file|document|report|log|record|certificate|transcript|statement|scoresheet|guide|card|rule|ticket|citation|memo|affidavit|worksheet|extraction|autopsy|record|instruction|notes) /.test(s)){const c=C();if(c){let best=null,bs=0;c.docs.forEach(d=>{const w=norm(d.title+' '+d.kind).split(' ').filter(x=>x.length>3);const sc=w.filter(x=>s.includes(' '+x+' ')).length;if(sc>bs){bs=sc;best=d;}});if(best){Bench.page=C().docs.indexOf(best);renderBench();openDoc(best.id);return;}tab('file');return;}}
  if(/^(close|close (the|that) (document|file))( |$)/.test(n)){$('#docov').hidden=true;return;}
  // 4. a ruling said aloud during the verdict phase opens the verdict and picks it
  if(G.phase==='Verdict'&&!G.busy){const i=matchOption(t,C().verdicts.map(v=>v.label));if(i>=0){G.autoPick=t;judgeSays(t);nextClicked();return;}}
@@ -1480,7 +1491,7 @@ const ASK={
  varga:{w1:['Detective, did she ask for a lawyer?','Was the gun safe empty?','What was in her car trunk?'],w2:['Doctor, what were the injuries on her neck?','How far away was the gun when it fired?'],w3:['Ms. Shah, what did you hear that night?','Had you called the police about that house before?'],dft:['Ms. Varga, what happened in the kitchen?']}};
 function q(s){return '<span class="say">“'+esc(s)+'”</span>';}
 function bookHTML(which){
- const idx=which!=null?which:(G.i>=0?G.i:0);const c=CASES[idx];
+ const idx=which!=null?which:(G.i>=0?G.i:0);const c=DOCKET[idx];
  const now=G.phase&&G.phase!=='End'?`<div class="now"><small>Right now · ${esc(G.phase)}</small><p>${G.dOpts?'A ruling is waiting. Say one of: '+G.dOpts.map(o=>q(o.split('—')[0].trim())).join(' '):'Say '+sayHints().map(h=>'<span class="say">'+esc(h)+'</span>').join(' or ')}</p></div>`:'';
  const stages=`<h3>Every trial, step by step</h3><div class="tblw"><table class="bk"><tr><th>Stage</th><th>What happens</th><th>Things you can say</th></tr>
  <tr><td>Start</td><td>Court opens, the clerk calls the case.</td><td>${q('Call the next case')} ${q('Let’s begin')}</td></tr>
@@ -1492,11 +1503,11 @@ function bookHTML(which){
  <tr><td>Sentence</td><td>You set the penalty within the guidelines.</td><td>${q('Twelve months probation, a fine of 250 dollars, community service')} ${q('Thirty months in prison and restitution')} ${q('Impose sentence')}</td></tr>
  <tr><td>Anytime</td><td></td><td>${q('Order in the court')} ${q('Wait')} ${q('Show me the calibration certificate')} ${q('Close')} ${q('Open the bench book')}</td></tr></table></div>
  <p class="hint">To talk to someone, start with their name or role: ${q('Detective, ...')} ${q('Ms. Tran, ...')} ${q('Counsel for the State, ...')} ${q('Bailiff, ...')} ${q('Clerk, ...')}. A question with no name goes to whoever is on the witness stand. With a Gemini key on, anything else you say is interpreted for you; without one, the clerk asks you to repeat it.</p>`;
- const tabs='<div class="bktabs">'+CASES.map((x,i)=>`<button data-bk="${i}" class="${i===idx?'on':''}">${i+1}. ${esc(x.title.replace('State v. ',''))}</button>`).join('')+'</div>';
+ const tabs='<div class="bktabs">'+DOCKET.map((x,i)=>`<button data-bk="${i}" class="${i===idx?'on':''}">${i+1}. ${esc(x.title.replace('State v. ',''))}</button>`).join('')+'</div>';
  const people=c.people.filter(p=>!p.hidden);
  const motions=c.motions.map(m=>`<div class="bkm"><b>${esc(m.title)}</b><p>${esc(m.text)}</p><p>${m.options.map(o=>q(o.split('—')[0].trim())+' → '+esc(o.split('—')[1]||o)).join('<br>')}</p></div>`).join('');
  const objs=c.script.filter(b=>b.obj).map(b=>`<li>${esc(b.obj.grounds)} — ${q('Sustained')} or ${q('Overruled')}</li>`).join('');
- const asks=Object.entries(ASK[c.id]||{}).map(([id,arr])=>{const p=c.people.find(x=>x.id===id);return p?`<li><b>${esc(p.name)}</b> (${esc(p.role)}): ${arr.map(q).join(' ')}</li>`:'';}).join('');
+ const asks=Object.entries(ASK[c.id]||c.ask||{}).map(([id,arr])=>{const p=c.people.find(x=>x.id===id);return p?`<li><b>${esc(p.name)}</b> (${esc(p.role)}): ${arr.map(q).join(' ')}</li>`:'';}).join('');
  const sent=c.sentence;const ex=(sent.extras||[]).map(e=>esc(e.label.split('(')[0].split('—')[0].trim().toLowerCase())).join(', ');
  const cs=`<h3>${esc(c.title)} <span class="hint">${esc(c.docket)} · ${esc(c.short)}</span></h3>
  <h4>Pretrial motions</h4>${motions}
@@ -1521,5 +1532,172 @@ try{if(localStorage.getItem('court4b.dock')){bookDocked=true;}}catch(e){}
 $('#tab-book').hidden=!bookDocked;
 $('#bookdock').onclick=dockBook;
 $('#bookov').addEventListener('click',e=>{if(e.target.id==='bookov'||e.target.id==='bookx')$('#bookov').hidden=true;});
+
+/* ===================================================== Gemini case generator */
+const TIERS=['Traffic infraction','Misdemeanor','Misdemeanor','Criminal traffic','Felony','Felony — Homicide'];
+const VOICES={m:['Charon','Puck','Fenrir','Orus','Iapetus','Enceladus','Algieba','Alnilam','Schedar','Achird','Sadaltager','Umbriel','Rasalgethi','Zubenelgenubi'],f:['Kore','Leda','Aoede','Despina','Callirrhoe','Gacrux','Erinome','Laomedeia','Achernar','Sulafat','Vindemiatrix','Autonoe','Pulcherrima']};
+const THEMES=['a food truck dispute','a hospital parking garage','a youth soccer tournament','a cryptocurrency ATM','a church fundraiser','a tattoo parlor','a self-storage facility','a hunting cabin','a high school prom','a ride-share pickup','a county fair','a marina','a 24-hour gym','a pawn shop','a construction site','an apartment laundry room','a dog park','a casino parking lot','a farmers market','a pharmacy drive-through','a college dorm','a car wash','a funeral home','a gas station at 3 AM','a wedding reception','a used car lot','a nursing home','a bowling alley','a rural highway rest stop','a downtown bar on St. Patrick\'s Day'];
+const GEN={};const genBusy={};
+function pastTitles(){try{return JSON.parse(localStorage.getItem('court4b.past')||'[]');}catch(e){return [];}}
+function remember(t){try{const a=pastTitles();a.push(t);localStorage.setItem('court4b.past',JSON.stringify(a.slice(-40)));}catch(e){}}
+function prefetch(i){if(i<DOCKET.length&&S.gen&&aiOn()&&!(DOCKET[i]&&DOCKET[i].generated))prepareCase(i,false);}
+async function prepareCase(i,show){
+ if(GEN[i]){DOCKET[i]=GEN[i];return true;}
+ if(show){$('#gencard').innerHTML=`<div class="sub">Clerk's office</div><h2>Preparing the case file…</h2><p>Gemini is drafting case ${i+1} of ${DOCKET.length}: the charges, police reports, witness statements and evidence. This takes about half a minute.</p><p class="hint" id="genstat">Drafting documents…</p>`;$('#genov').hidden=false;}
+ if(!genBusy[i])genBusy[i]=genCase(i).then(c=>{if(c){GEN[i]=c;}return c;}).catch(e=>{console.warn('gen',e);return null;});
+ const c=await genBusy[i];delete genBusy[i];
+ if(show)$('#genov').hidden=true;
+ if(c){DOCKET[i]=c;return true;}return false;
+}
+async function genCase(i){
+ const tier=TIERS[i]||'Misdemeanor';const theme=THEMES[Math.floor(Math.random()*THEMES.length)];const guiltyAns=Math.random()<0.5;
+ const ex=JSON.parse(JSON.stringify(CASES[2]));delete ex.truth;
+ const prompt=`You write realistic, original US state criminal court cases for a courtroom simulation game where the player is the judge (bench trial, no jury). Write ONE complete new case as JSON in EXACTLY the same structure as the example below.
+
+TIER: ${tier}. ${tier.includes('Homicide')?'A homicide (murder, manslaughter, or vehicular homicide).':tier==='Traffic infraction'?'A non-criminal traffic ticket (not DUI).':tier==='Criminal traffic'?'A criminal traffic offense (DUI, leaving the scene, driving while license suspended, reckless driving, etc.).':tier==='Felony'?'A non-homicide felony (robbery, burglary, aggravated assault, drug trafficking, fraud, arson, etc.).':'A misdemeanor (theft, battery, trespass, criminal mischief, resisting without violence, etc.).'}
+SETTING IDEA (use it loosely): ${theme}. The state is the fictional "State of Harlan", Harlan County, city of Harlan. Date in 2026.
+Avoid repeating these earlier cases: ${pastTitles().slice(-12).join('; ')||'none'}.
+The legally correct verdict for this case should be ${guiltyAns?'GUILTY (the admissible evidence proves it)':'NOT GUILTY / not responsible (a defense succeeds or the admissible evidence falls short)'}.
+
+REQUIREMENTS
+- "id": short lowercase slug. "docket": like "2026-MM-00xxxx" (TR traffic, MM misdemeanor, CT criminal traffic, CF felony). "tier": "${tier}". "title": "State v. <Defendant full name>". "short": one-line summary.
+- "charges": 1-2 with realistic Harlan statute code, description, and class with maximum penalty.
+- "people": prosecutor id "pros" (seat "pros"), defense attorney id "def" (seat "def") — or, ONLY for traffic infractions, a self-represented defendant with {"id":"def","name":"(Self-represented)","role":"Pro se","seat":"none","hidden":1} and the defendant seated "def". Defendant id "dft" (seat "dft"). 2-4 witnesses ids "w1","w2","w3","w4" with seat "gallery". Every person: name, role, seat, voice (male voices: ${VOICES.m.join(', ')}; female voices: ${VOICES.f.join(', ')}), look {skin:"#hex", hair:"#hex", style: one of short|long|bob|bun|curly|bald, suit:"#hex", f:1 if female else 0, uni:1 if in police/deputy uniform}, persona (2-4 sentences: personality, what they know, what they will admit only if pressed, any lie they tell).
+- "truth": what really happened, in detail, including each hidden decisive detail.
+- "docs": 5-8 documents. Each: id, title, kind, head (official header in caps), and any of fields [[label,value],...], table [[header...],[row...]...], body [[heading,text],...], optional stamp. Make them DETAILED and concrete: exact times, addresses, badge numbers, measurements, lab values, quoted statements, chain of custody, prior record, and a sentencing guide document. Hide 1-3 decisive details in them (a timestamp that contradicts a statement, a missing warrant, an expired certification, an invocation of counsel, etc.). Include one document stating the relevant legal rule.
+- "motions": 1-2 pretrial motions, each {id:"m1", by:"def" or "pros", title, text, pro (movant's spoken argument), con (opponent's spoken reply), options:[exactly 2 strings like "Grant — suppress X","Deny — X admissible"], correct: 0 or 1, why (legal reason, cite real US doctrine/rules), excl:[doc ids excluded IF granted]}. At least one motion must be decided by a detail in the documents.
+- "script": 18-36 beats of the trial: {who:id,t:spoken line}, {call:id} (witness walks to stand), {back:id} (leaves stand), {obj:{by:id,grounds,q,correct:"sustain"|"overrule",why}} placed right after an improper (or proper-but-objected) question. Include 1-3 objections. Swear in each witness via the "clerk" (who:"clerk"). Lawyers may use "bailiff" or "clerk" ids too. Natural spoken courtroom English.
+- "closing": exactly 2 lines [{who:"pros",t},{who:"def" or "dft",t}].
+- "verdicts": 2-3 options {k, label, score}; k is "g" (guilty), "ng" (not guilty), "resp", "nr", "lesser", "man", "reck", or "gt"; the legally best option has score 35, a defensible lesser option up to 18, clearly wrong 0.
+- "verdictWhy": why the best verdict is right given the correct rulings.
+- "sentence": {kind:"infraction"|"misd"|"felony", jailUnit:"days"|"months", jailMax, fineMax, fineMin(optional), probMax, guide:{jail:[min,max], fine:[min,max], prob:[min,max]}, extras:[{k,label}...], need:[required extra keys], note}. For infractions use guide:{fine:[min,max]}.
+- "ask": {personId:[2-3 sharp questions the judge could ask]}.
+- Use only ids that exist. All spoken text must be things a person would say aloud.
+
+EXAMPLE OF THE EXACT STRUCTURE (content must be completely different):
+${JSON.stringify(ex)}
+
+Return ONLY the JSON object.`;
+ const st=t=>{const el=$('#genstat');if(el)el.textContent=t;};
+ st('Drafting documents…');
+ const raw=await aiText(prompt,120000,1.0);st('Checking the file…');
+ const c=normCase(parseJSON(raw),tier);if(!c)throw new Error('Generated case failed validation');
+ c.generated=true;remember(c.title);return c;
+}
+function normCase(c,tier){
+ if(!c||typeof c!=='object')return null;
+ const A=x=>Array.isArray(x)?x:[];const str=(x,d)=>typeof x==='string'&&x.trim()?x.trim():d;
+ c.id=str(c.id,'gen'+Date.now());c.tier=tier;c.docket=str(c.docket,'2026-XX-'+String(Math.floor(Math.random()*9e5)+1e5));
+ c.charges=A(c.charges).filter(x=>x&&x.desc).map(x=>({code:str(x.code,'§'),desc:x.desc,cls:str(x.cls,'')}));if(!c.charges.length)return null;
+ // people
+ const used={m:new Set(),f:new Set()};
+ c.people=A(c.people).filter(p=>p&&p.id&&p.name);
+ const byId={};c.people.forEach(p=>byId[p.id]=p);
+ if(!byId.pros)c.people.unshift({...ADA_COLE});if(!byId.dft)return null;
+ if(!byId.def)c.people.push({...PD_FELD});
+ const okStyle=['short','long','bob','bun','curly','bald'];const hex=(x,d)=>/^#[0-9a-f]{6}$/i.test(x||'')?x:d;
+ c.people.forEach(p=>{
+  p.role=str(p.role,p.id==='pros'?'Assistant State Attorney':p.id==='def'?'Defense counsel':p.id==='dft'?'Defendant':'Witness');
+  p.persona=str(p.persona,'Speaks plainly and answers what is asked.');
+  if(p.id==='pros')p.seat='pros';else if(p.id==='def')p.seat=p.hidden?'none':'def';else if(p.id==='dft')p.seat=(byId.def&&byId.def.hidden)||p.seat==='def'?'def':'dft';else p.seat='gallery';
+  const L=p.look||{};const f=L.f?1:0;p.look={skin:hex(L.skin,'#d9a982'),hair:hex(L.hair,'#2a1a10'),style:okStyle.includes(L.style)?L.style:(f?'long':'short'),suit:hex(L.suit,'#3a3f4a'),f,uni:L.uni?1:0};
+  const pool=f?VOICES.f:VOICES.m,set=used[f?'f':'m'];if(!pool.includes(p.voice)||set.has(p.voice))p.voice=pool.find(v=>!set.has(v))||pool[0];set.add(p.voice);
+ });
+ if(c.people.filter(p=>p.seat==='gallery').length>9)c.people=c.people.filter((p,i,a)=>p.seat!=='gallery'||a.filter(x=>x.seat==='gallery').indexOf(p)<9);
+ const ids=new Set(c.people.map(p=>p.id).concat(['clerk','bailiff']));
+ // docs
+ c.docs=A(c.docs).filter(d=>d&&d.title).map((d,k)=>({id:str(d.id,'d'+k),title:d.title,kind:str(d.kind,'Document'),head:str(d.head,d.title.toUpperCase()),fields:A(d.fields).filter(r=>Array.isArray(r)&&r.length>=2).map(r=>[String(r[0]),String(r[1])]),table:A(d.table).filter(r=>Array.isArray(r)).map(r=>r.map(String)),body:A(d.body).filter(r=>Array.isArray(r)&&r.length>=2).map(r=>[String(r[0]),String(r[1])]),stamp:d.stamp?String(d.stamp):undefined}));
+ c.docs.forEach(d=>{if(!d.fields.length)delete d.fields;if(d.table.length<2)delete d.table;if(!d.body.length)delete d.body;});
+ if(c.docs.length<3)return null;const docIds=new Set(c.docs.map(d=>d.id));
+ // motions
+ c.motions=A(c.motions).filter(m=>m&&m.title&&A(m.options).length>=2).slice(0,3).map((m,k)=>({id:'m'+(k+1),by:ids.has(m.by)&&m.by!=='clerk'?m.by:'def',title:m.title,text:str(m.text,m.title),pro:str(m.pro,'Your Honor, we ask the court to grant the motion.'),con:str(m.con,'The State opposes the motion, Your Honor.'),options:m.options.slice(0,2).map(String),correct:m.correct===1||m.correct==='1'?1:0,why:str(m.why,''),excl:A(m.excl).filter(x=>docIds.has(x))}));
+ c.motions.forEach(m=>{if(G&&false)return;const by=c.people.find(p=>p.id===m.by);if(by&&by.hidden)m.by='dft';});
+ if(!c.motions.length)return null;
+ // script
+ c.script=A(c.script).map(b=>{if(!b||typeof b!=='object')return null;
+  if(b.call)return ids.has(b.call)?{call:b.call}:null;if(b.back)return ids.has(b.back)?{back:b.back}:null;
+  if(b.obj){const o=b.obj;return ids.has(o.by)?{obj:{by:o.by,grounds:str(o.grounds,'Objection'),q:str(o.q,'the last question'),correct:o.correct==='overrule'?'overrule':'sustain',why:str(o.why,'')}}:null;}
+  if(b.who&&b.t&&ids.has(b.who)){const per=c.people.find(p=>p.id===b.who);if(per&&per.hidden)return null;return {who:b.who,t:String(b.t)};}return null;}).filter(Boolean);
+ // close any witness still on the stand
+ let on=null;const fixed=[];c.script.forEach(b=>{if(b.call){if(on)fixed.push({back:on});on=b.call;}if(b.back){if(on!==b.back)return;on=null;}fixed.push(b);});if(on)fixed.push({back:on});c.script=fixed;
+ if(c.script.filter(b=>b.t).length<8)return null;
+ c.closing=A(c.closing).filter(l=>l&&ids.has(l.who)&&l.t).map(l=>({who:l.who,t:String(l.t)})).slice(0,3);
+ if(!c.closing.length)c.closing=[{who:'pros',t:'The State has proven its case, Your Honor.'},{who:c.people.find(p=>p.id==='def'&&!p.hidden)?'def':'dft',t:'The evidence falls short, Your Honor.'}];
+ // verdicts
+ c.verdicts=A(c.verdicts).filter(v=>v&&v.label).map(v=>({k:['g','ng','resp','nr','lesser','man','reck','gt'].includes(v.k)?v.k:(/not/i.test(v.label)?'ng':'g'),label:String(v.label),score:Math.max(0,Math.min(35,+v.score||0))}));
+ if(c.verdicts.length<2)return null;if(!c.verdicts.some(v=>v.score===35)){c.verdicts.sort((a,b)=>b.score-a.score);c.verdicts[0].score=35;}
+ c.verdictWhy=str(c.verdictWhy,'');c.truth=str(c.truth,'');c.short=str(c.short,c.charges[0].desc);c.title=str(c.title,'State v. '+c.people.find(p=>p.id==='dft').name);
+ // sentence
+ const se=c.sentence||{};const kind=['infraction','misd','felony'].includes(se.kind)?se.kind:(tier.startsWith('Felony')?'felony':tier==='Traffic infraction'?'infraction':'misd');
+ const pair=(x,d)=>Array.isArray(x)&&x.length===2&&x.every(n=>isFinite(+n))?[+x[0],+x[1]].sort((a,b)=>a-b):d;
+ const g=se.guide||{};
+ c.sentence={kind,jailUnit:se.jailUnit==='months'||kind==='felony'?'months':'days',jailMax:Math.max(1,+se.jailMax||(kind==='felony'?180:365)),fineMax:Math.max(0,+se.fineMax||(kind==='infraction'?500:1000)),fineMin:+se.fineMin||0,probMax:Math.max(0,+se.probMax||12),
+  guide:kind==='infraction'?{fine:pair(g.fine,[100,300])}:{jail:pair(g.jail,[0,0]),fine:pair(g.fine,[0,500]),prob:pair(g.prob,[0,12])},
+  extras:A(se.extras).filter(e=>e&&e.k&&e.label).map(e=>({k:String(e.k),label:String(e.label)})).slice(0,6),need:[],note:str(se.note,'')};
+ const ek=new Set(c.sentence.extras.map(e=>e.k));c.sentence.need=A(se.need).filter(k=>ek.has(k));
+ if(c.ask&&typeof c.ask==='object'){const a={};Object.entries(c.ask).forEach(([k,v])=>{if(ids.has(k)&&Array.isArray(v))a[k]=v.map(String).slice(0,3);});c.ask=a;}else c.ask={};
+ return c;
+}
+
+/* ===================================================== 3D case file on the bench */
+const Bench={on:false,page:0,flip:null,group:null,left:null,right:null,flipper:null,ready:false};
+function pageCanvas(doc,c,pageNo,total,isIndex){
+ const W2=900,H2=1200;const cv=document.createElement('canvas');cv.width=W2;cv.height=H2;const g=cv.getContext('2d');
+ g.fillStyle='#f1e9d4';g.fillRect(0,0,W2,H2);for(let i=0;i<1400;i++){g.fillStyle=`rgba(120,100,60,${Math.random()*0.035})`;g.fillRect(Math.random()*W2,Math.random()*H2,2,2);}
+ const F=(w,sz)=>`${w} ${sz}px "Courier Prime","Courier New",monospace`;g.fillStyle='#1f1a14';let y=70;const L=56,R=W2-56;
+ const wrap=(text,font,lh,x0)=>{g.font=font;x0=x0||L;String(text).split('\n').forEach(par=>{let line='';par.split(' ').forEach(w=>{const tt=line?line+' '+w:w;if(g.measureText(tt).width>R-x0){g.fillText(line,x0,y);y+=lh;line=w;}else line=tt;});if(line){g.fillText(line,x0,y);y+=lh;}});};
+ if(isIndex){g.textAlign='center';g.font=F('700',30);g.fillText('HARLAN COUNTY CIRCUIT COURT',W2/2,y);y+=40;g.font=F('400',24);g.fillText('CASE FILE — '+c.docket,W2/2,y);y+=50;g.fillText(c.title.toUpperCase(),W2/2,y);y+=30;g.fillRect(L,y,R-L,3);y+=50;g.textAlign='left';
+  g.font=F('700',24);g.fillText('CHARGES',L,y);y+=34;c.charges.forEach(ch=>{wrap(ch.code+'  '+ch.desc,F('400',22),30);wrap(ch.cls,F('400',19),26);y+=8;});y+=16;
+  g.font=F('700',24);g.fillText('CONTENTS',L,y);y+=36;c.docs.forEach((d,k)=>{g.fillStyle=k+1===pageNo?'#7a1f24':'#1f1a14';wrap(`${String(k+1).padStart(2,' ')}. ${d.title}${G.excluded.has(d.id)?'  [EXCLUDED]':''}`,F(k+1===pageNo?'700':'400',21),29);});
+  g.fillStyle='#6b5d44';g.font=F('400',18);g.fillText('Click a page to read it full size · ← → or “next page” to turn',L,H2-50);return cv;}
+ g.textAlign='center';g.font=F('700',25);wrap(doc.head||doc.title,F('700',25),32,L);g.textAlign='left';
+ g.font=F('400',17);g.fillText(c.title.toUpperCase()+' · '+c.docket,L,y);y+=14;g.fillRect(L,y,R-L,3);y+=36;
+ // centered head fix: redraw head centered
+ if(doc.fields){doc.fields.forEach(([k,v])=>{if(y>H2-80)return;g.font=F('700',19);const kh=y;wrap(k,F('700',19),25,L);const yy=y;y=kh;wrap(v,F('400',19),25,L+290);y=Math.max(y,yy)+6;g.fillStyle='rgba(0,0,0,.15)';g.fillRect(L,y-22,R-L,1);g.fillStyle='#1f1a14';});y+=10;}
+ if(doc.table){const cols=doc.table[0].length;const cw=(R-L)/cols;doc.table.forEach((row,ri)=>{if(y>H2-80)return;let maxY=y;row.forEach((cell,ci)=>{const sy=y;const oldR=R;g.font=F(ri?'400':'700',17);let line='',yy=sy;String(cell).split(' ').forEach(w=>{const tt=line?line+' '+w:w;if(g.measureText(tt).width>cw-10){g.fillText(line,L+ci*cw,yy);yy+=22;line=w;}else line=tt;});if(line){g.fillText(line,L+ci*cw,yy);yy+=22;}maxY=Math.max(maxY,yy);});y=maxY+8;g.fillStyle='rgba(0,0,0,.18)';g.fillRect(L,y-20,R-L,1);g.fillStyle='#1f1a14';});y+=12;}
+ if(doc.body){doc.body.forEach(([h,t])=>{if(y>H2-90)return;wrap(String(h).toUpperCase(),F('700',19),26);wrap(t,F('400',19),25);y+=12;});}
+ if(y>H2-60){g.fillStyle='#f1e9d4';g.fillRect(0,H2-70,W2,70);g.fillStyle='#7a1f24';g.font=F('700',18);g.fillText('(continued — click to read in full)',L,H2-40);}
+ const stamp=G.excluded.has(doc.id)?'EXCLUDED':doc.stamp;if(stamp){g.save();g.translate(W2-230,210);g.rotate(-0.22);g.strokeStyle='rgba(179,38,30,.8)';g.lineWidth=6;g.font='700 54px Arial';g.fillStyle='rgba(179,38,30,.8)';const w=g.measureText(stamp).width;g.strokeRect(-w/2-16,-44,w+32,62);g.textAlign='center';g.fillText(stamp,0,6);g.restore();}
+ g.fillStyle='#6b5d44';g.font=F('400',17);g.textAlign='right';g.fillText(`Page ${pageNo} of ${total}`,R,H2-26);return cv;}
+function texFrom(cv){const t=new THREE.CanvasTexture(cv);t.encoding=THREE.sRGBEncoding;t.anisotropy=8;return t;}
+function buildBenchFile(){
+ if(!R)return;const g=new THREE.Group();g.position.set(0,1.71,-8.33);g.rotation.set(-1.29,Math.PI,0,'YXZ');scene.add(g);Bench.group=g;
+ const pw=0.36,ph=0.48;
+ const cover=new THREE.Mesh(new THREE.BoxGeometry(pw*2+0.03,ph+0.03,0.008),M(0x7a5a2e,{roughness:0.7}));cover.position.z=-0.006;g.add(cover);
+ const tab=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.04,0.008),M(0x7a5a2e));tab.position.set(-pw+0.1,ph/2+0.03,-0.006);g.add(tab);
+ const stack=new THREE.Mesh(new THREE.BoxGeometry(pw*2,ph,0.012),M(0xe6dcc2));stack.position.z=0.002;g.add(stack);
+ const mk=(x)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(pw,ph),new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.9}));m.position.set(x,0,0.0095);g.add(m);return m;};
+ Bench.left=mk(-pw/2);Bench.right=mk(pw/2);
+ const fg=new THREE.PlaneGeometry(pw,ph);fg.translate(pw/2,0,0);
+ const fl=new THREE.Mesh(fg,new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.9,side:THREE.DoubleSide}));fl.position.z=0.011;fl.visible=false;g.add(fl);Bench.flipper=fl;
+ Bench.pw=pw;Bench.ready=true;
+ // clickable hit area
+ R.domElement.addEventListener('click',benchClick);R.domElement.addEventListener('dblclick',e=>{const h=benchHit(e);if(h)openBenchFull();});
+}
+function benchPages(){const c=C()||DOCKET[0];return c?c.docs.length:0;}
+function renderBench(){if(!Bench.ready)return;const c=C()||DOCKET[0];if(!c)return;const n=c.docs.length;Bench.page=Math.max(0,Math.min(n-1,Bench.page));
+ const old=[Bench.left.material.map,Bench.right.material.map];
+ Bench.left.material.map=texFrom(pageCanvas(null,c,Bench.page+1,n,true));Bench.right.material.map=texFrom(pageCanvas(c.docs[Bench.page],c,Bench.page+1,n,false));
+ Bench.left.material.needsUpdate=Bench.right.material.needsUpdate=true;old.forEach(t=>t&&t.dispose());}
+function turnPage(d){const n=benchPages();const np=Bench.page+d;if(np<0||np>=n||Bench.flip)return;
+ const fl=Bench.flipper;fl.material.map&&fl.material.map.dispose();fl.material.map=texFrom(pageCanvas(C().docs[Bench.page],C(),Bench.page+1,n,false));fl.material.needsUpdate=true;
+ fl.position.x=0;fl.visible=true;Bench.flip={t:0,d};if(d<0){fl.rotation.y=-Math.PI;}else fl.rotation.y=0;
+ Bench.page=np;renderBench();try{const c=ctx();if(c){const b=c.createBuffer(1,c.sampleRate*0.18,c.sampleRate),x=b.getChannelData(0);for(let i=0;i<x.length;i++)x[i]=(Math.random()*2-1)*Math.sin(Math.PI*i/x.length)*0.15;const s=c.createBufferSource(),gg=c.createGain();gg.gain.value=S.vol/100;s.buffer=b;s.connect(gg);gg.connect(c.destination);s.start();}}catch(e){}}
+function animBench(dt){const f=Bench.flip;if(!f)return;f.t+=dt*2.6;const k=Math.min(1,f.t);const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+ Bench.flipper.rotation.y=f.d>0?-Math.PI*e:-Math.PI*(1-e);Bench.flipper.position.z=0.011+Math.sin(Math.PI*e)*0.05;if(k>=1){Bench.flipper.visible=false;Bench.flip=null;}}
+const ray=()=>new THREE.Raycaster();
+function benchHit(e){if(!Bench.ready)return null;const r=R.domElement.getBoundingClientRect();const m=new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);const rc=ray();rc.setFromCamera(m,cam);const h=rc.intersectObjects([Bench.left,Bench.right,Bench.group.children[0]]);return h[0]||null;}
+function benchClick(e){if(W.dragMoved)return;const h=benchHit(e);if(!h)return;if(!Bench.on){lookDown(true);return;}
+ if(h.object===Bench.left){const uv=h.uv;if(uv&&uv.x>0.85)turnPage(-1);else{ // index line pick
+   const c=C();const yPix=(1-uv.y)*1200;const idx=Math.floor((yPix-420)/29);if(c&&idx>=0&&idx<c.docs.length&&uv.y<0.66){Bench.page=idx;renderBench();}else turnPage(-1);}return;}
+ if(h.object===Bench.right){const uv=h.uv;if(uv&&uv.x>0.8)turnPage(1);else if(uv&&uv.x<0.15)turnPage(-1);else openBenchFull();}}
+function openBenchFull(){const c=C();if(c&&c.docs[Bench.page])openDoc(c.docs[Bench.page].id);}
+function lookDown(on){Bench.on=on;$('#v-file').classList.toggle('on',on);$('#benchhint').hidden=!on;if(on){renderBench();W.manual=performance.now()+1e9;}else{W.manual=0;W.look.yaw=0;W.look.pitch=-0.12;}}
+
+/* ===================================================== boot */
+aiStat();wire();initGL();setPhase('');renderFile();
+// preview cast so the room is populated behind the intro
+G.i=0;loadCast(DOCKET[0]);G.i=-1;
+renderBench();
 </script>
 </body></html>

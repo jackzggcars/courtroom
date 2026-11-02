@@ -6,6 +6,14 @@ A 3D US criminal courtroom game. You are the presiding judge of the Harlan Count
 - Rule on pretrial motions and on objections during testimony.
 - Deliver verdicts and sentences within the guidelines. An appellate review grades every ruling.
 
+## New cases every session
+
+With a Gemini key, Gemini drafts a brand-new case for each of the six docket slots (traffic, misdemeanors, criminal traffic, felony, homicide): the people, 5-8 detailed documents, pretrial motions, testimony, objections, the hidden truth, the correct verdict and sentencing guidelines. Each case is checked before it reaches the courtroom; if a draft is unusable, a standard case is used instead. Turn this off in Settings.
+
+## The bench file
+
+A 3D case file sits on the judge's bench. Click it, press **D**, or say "look down" to read it. Turn pages with the arrow keys, by clicking the page edges, or by saying "next page". Click a page or press Enter to read it full size.
+
 ## Talking to the court
 
 Hold **Space** (or the mic button) and speak. The game asks for microphone permission when it loads. Try:
