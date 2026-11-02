@@ -722,8 +722,19 @@ async function decodePCM(a){const bin=atob(a.data);const u8=new Uint8Array(bin.l
  if(bin.slice(0,4)==='RIFF')return await c.decodeAudioData(u8.buffer.slice(0));const m=/rate=(\d+)/.exec(a.mime||'');const rate=m?+m[1]:24000;const n=Math.floor(u8.length/2);const buf=c.createBuffer(1,n,rate);const ch=buf.getChannelData(0);const dv=new DataView(u8.buffer);for(let i=0;i<n;i++)ch[i]=dv.getInt16(i*2,true)/32768;return buf;}
 
 /* ===================================================== text AI */
+let MODELS=null;
+async function listModels(){
+ if(MODELS)return MODELS;
+ try{const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',{headers:{'x-goog-api-key':S.key}});const j=await r.json();
+  const ver=n=>{const m=n.match(/gemini-(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):0;};
+  const names=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace(/^models\//,''))
+   .filter(n=>/^gemini-/.test(n)&&!/tts|image|live|embed|audio|native|robotics|computer|learnlm|exp-/.test(n));
+  const score=n=>ver(n)*10+(/flash/.test(n)?3:0)-(/lite/.test(n)?2:0)-(/preview/.test(n)?0.5:0)+(/pro/.test(n)?-1:0);
+  MODELS=names.sort((a,b)=>score(b)-score(a));}catch(e){MODELS=[];}
+ return MODELS;}
 async function aiText(prompt){
- const ms=[...new Set([S.model,'gemini-3.8-flash','gemini-3-flash','gemini-flash-latest','gemini-2.5-flash'].filter(Boolean))];let last=null;
+ const avail=await listModels();
+ const ms=[...new Set([avail.includes(S.model)?S.model:null,...avail.slice(0,4),avail.length?null:S.model].filter(Boolean))];let last=null;
  for(const m of ms){
   try{const j=await gpost('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.85,responseMimeType:'application/json'}},40000);
    const t=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[]).map(p=>p.text||'').join('');
@@ -1196,7 +1207,7 @@ const pick=a=>a[Math.floor(Math.random()*a.length)];
 
 /* ---------------- UI wiring */
 function fillSettings(){$('#s-key').value=S.key;$('#s-model').value=S.model;$('#s-tts').value=S.tts;$('#s-ai').checked=S.ai;$('#s-voice').checked=S.voice;$('#s-gvoice').checked=S.gvoice;$('#s-auto').checked=S.auto;$('#s-vol').value=S.vol;$('#s-pace').value=String(S.pace);$('#s-err').textContent='';}
-function readSettings(){S.key=$('#s-key').value.trim();S.model=$('#s-model').value.trim()||'gemini-3.8-flash';S.tts=$('#s-tts').value.trim()||'gemini-3.8-flash-tts';S.ai=$('#s-ai').checked;S.voice=$('#s-voice').checked;S.gvoice=$('#s-gvoice').checked;S.auto=$('#s-auto').checked;S.vol=Math.max(0,Math.min(100,+$('#s-vol').value||85));S.pace=+$('#s-pace').value||1;saveS();aiStat();Voice.fails=0;}
+function readSettings(){if($('#s-key').value.trim()!==S.key)MODELS=null;S.key=$('#s-key').value.trim();S.model=$('#s-model').value.trim()||'gemini-3.8-flash';S.tts=$('#s-tts').value.trim()||'gemini-3.8-flash-tts';S.ai=$('#s-ai').checked;S.voice=$('#s-voice').checked;S.gvoice=$('#s-gvoice').checked;S.auto=$('#s-auto').checked;S.vol=Math.max(0,Math.min(100,+$('#s-vol').value||85));S.pace=+$('#s-pace').value||1;saveS();aiStat();Voice.fails=0;}
 function wire(){
  $('#i-name').value=S.name;$('#i-key').value=S.key;
  $('#go').onclick=()=>{S.name=$('#i-name').value.trim()||'Judge Hollis';S.key=$('#i-key').value.trim();saveS();aiStat();$('#intro').hidden=true;ctx();refreshPlate();startCase(0);};
@@ -1261,35 +1272,41 @@ function voiceSentence(t){const n=norm(t);const num=(re)=>{const m=n.match(re);r
  sys('Heard for sentencing: “'+t+'”. Say “impose sentence” or press the button when the form is right.');
  if(/\b(impose|so ordered|that is the sentence|that's the sentence)\b/.test(n))$('#sgo').click();}
 
-const Mic={rec:null,on:false,buf:'',mode:null,media:null,chunks:[],
- supported(){return !!(window.SpeechRecognition||window.webkitSpeechRecognition)||!!(navigator.mediaDevices&&window.MediaRecorder);},
- async start(){if(this.on)return;this.on=true;this.buf='';ctx();duck(true);$('#mic').classList.add('on');setSub('Listening…','Speak now. Release Space when you finish.');
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(SR&&!this.srFailed){try{const r=new SR();this.rec=r;this.mode='sr';r.lang='en-US';r.continuous=true;r.interimResults=true;
-    r.onresult=e=>{let fin='',int='';for(let i=0;i<e.results.length;i++){const x=e.results[i];(x.isFinal?(fin+=x[0].transcript+' '):(int+=x[0].transcript));}this.buf=fin;const show=(fin+int).trim();if(show)setSub(S.name+' (speaking)',show);};
-    r.onerror=e=>{if(/not-allowed|service-not-allowed|audio-capture|network/.test(e.error)){this.srFailed=true;if(S.key){sys('Browser speech recognition is unavailable here ('+e.error+'). Switching to Gemini transcription: hold Space and speak again.');this.on=false;$('#mic').classList.remove('on');duck(false);setSub('Court reporter','Switched to Gemini transcription. Hold Space and speak again.');setTimeout(()=>setSub(),3500);}else this.blocked(e.error);}};
-    r.onend=()=>{if(this.on&&this.mode==='sr'){try{r.start();}catch(_){}}};r.start();return;}catch(e){this.srFailed=true;}}
-  if(S.key&&navigator.mediaDevices){try{const st=await navigator.mediaDevices.getUserMedia({audio:true});this.mode='rec';this.chunks=[];const mr=new MediaRecorder(st);this.media=mr;mr.ondataavailable=e=>e.data.size&&this.chunks.push(e.data);mr.start();return;}catch(e){this.blocked(e.name||'blocked');}}
-  else this.blocked('no-api');},
- async stop(){if(!this.on)return;this.on=false;$('#mic').classList.remove('on');duck(false);
-  if(this.mode==='sr'&&this.rec){const r=this.rec;this.rec=null;this.mode=null;await new Promise(res=>{let done=false;const fin=()=>{if(!done){done=true;res();}};r.onend=fin;try{r.stop();}catch(_){fin();}setTimeout(fin,1200);});
-   const t=this.buf.trim();setSub();if(t)handleSpoken(t);else if(!this.srFailed)sys('The court reporter did not catch that. Hold Space and speak again.');return;}
-  if(this.mode==='rec'&&this.media){const mr=this.media;this.media=null;this.mode=null;await new Promise(res=>{mr.onstop=res;mr.stop();});mr.stream.getTracks().forEach(t=>t.stop());
-   const blob=new Blob(this.chunks,{type:mr.mimeType||'audio/webm'});setSub('Court reporter','Transcribing…');
-   const fail=m=>{setSub('Court reporter',m);sys(m,'bad');setTimeout(()=>{if($('#sub').textContent.includes(m))setSub();},5000);};
-   if(blob.size<800){fail('No audio was recorded. Check that the right microphone is selected in your browser.');return;}
-   try{const b64=await toWav16(blob);
-    const ms=[...new Set([S.model,'gemini-3.8-flash','gemini-flash-latest','gemini-2.5-flash'])];let text='',err='';const t0=Date.now();
-    for(const m of ms){if(Date.now()-t0>20000)break;
-     try{const j=await gpost('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{contents:[{parts:[{inline_data:{mime_type:'audio/wav',data:b64}},{text:'Transcribe this English speech exactly. Output only the words spoken, nothing else. If there is no speech, output nothing.'}]}],generationConfig:{temperature:0}},12000);
-      text=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('').trim();if(text)break;err='no words heard';}
-     catch(e){err=String(e.message||e).slice(0,160);if(/401|403|API key/i.test(err))break;}}
-    if(text){setSub(S.name,text);setTimeout(()=>setSub(),1500);handleSpoken(text);}
-    else fail('Could not transcribe ('+(err||'no answer')+'). Try again, or open the game from GitHub Pages so your browser can recognise speech itself.');
-   }catch(e){fail('Transcription failed: '+String(e.message||e).slice(0,140));}}
-  else setSub();},
- blocked(why){this.on=false;$('#mic').classList.remove('on');duck(false);setSub();
-  sys('The microphone is blocked in this view ('+why+'). Open the downloadable copy of Courtroom 4B in Chrome or Edge to speak from the bench; typing still works here.','bad');}
+const Mic={
+ rec:null,active:false,starting:false,wantStop:false,granted:false,supported:!!(window.SpeechRecognition||window.webkitSpeechRecognition),
+ acc:'',cur:'',on:false,
+ text(){return (this.acc+' '+this.cur).replace(/\s+/g,' ').trim();},
+ async start(){
+  if(this.active||this.starting)return;
+  if(!this.supported){this.fail('unsupported');return;}
+  this.on=true;this.starting=true;this.wantStop=false;this.acc='';this.cur='';ctx();duck(true);$('#mic').classList.add('on');setSub(S.name+' (listening)','Speak now. Let go of Space when you finish.');
+  if(!this.granted){
+   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){this.starting=false;this.fail(window.isSecureContext===false?'insecure-context':'unsupported');return;}
+   try{const st=await navigator.mediaDevices.getUserMedia({audio:true});st.getTracks().forEach(t=>t.stop());this.granted=true;}
+   catch(e){this.starting=false;this.fail(e&&e.name==='NotFoundError'?'no-microphone':'not-allowed');return;}
+  }
+  this.starting=false;if(this.wantStop){this.finish();return;}
+  this.begin();
+ },
+ begin(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;const r=new SR();
+  r.lang='en-GB';r.interimResults=true;r.continuous=true;r.maxAlternatives=1;this.cur='';
+  r.onresult=ev=>{let fin='',interim='';for(let i=0;i<ev.results.length;i++){const t=ev.results[i][0].transcript;if(ev.results[i].isFinal)fin+=t+' ';else interim+=t;}
+   this.cur=(fin+interim).trim();const show=this.text();if(show)setSub(S.name+' (speaking)',show);};
+  r.onerror=ev=>{if(ev.error==='no-speech'||ev.error==='aborted')return;this.active=false;this.wantStop=true;this.fail(ev.error);};
+  r.onend=()=>{this.acc=this.text();this.cur='';
+   if(!this.wantStop&&this.active){try{this.begin();return;}catch(e){}}   // browser ended on its own while Space is still held: keep listening
+   const was=this.active;this.active=false;if(was)this.finish();};
+  try{r.start();this.rec=r;this.active=true;}catch(e){this.active=false;this.fail(String(e&&e.message||e));}
+ },
+ stop(){if(!this.on)return;this.wantStop=true;if(this.starting)return;
+  if(this.rec&&this.active){setTimeout(()=>{try{this.rec.stop();}catch(e){this.finish();}},250);}else this.finish();},
+ finish(){if(!this.on)return;this.on=false;$('#mic').classList.remove('on');duck(false);
+  const t=this.acc||this.text();this.acc='';this.cur='';
+  if(t){setSub(S.name,t);setTimeout(()=>setSub(),1200);handleSpoken(t);}else{setSub();sys('The court reporter did not catch that. Hold Space and speak again.');}},
+ fail(why){this.on=false;this.active=false;$('#mic').classList.remove('on');duck(false);
+  const msg={'not-allowed':'The microphone is blocked. Click the icon at the left of the address bar, set Microphone to Allow, and reload.','service-not-allowed':'Speech recognition is turned off in this browser. Use Chrome or Edge.','no-microphone':'No microphone was found.','insecure-context':'Speech needs a secure page. Open the game from GitHub Pages (https).','unsupported':'This browser has no speech recognition. Use Chrome or Edge.','network':'Speech recognition could not reach its service. Check your connection and try again.','audio-capture':'The microphone could not be opened. Check that no other app is using it.'}[why]||('Microphone error: '+why);
+  setSub('Court reporter',msg);sys(msg,'bad');setTimeout(()=>{if($('#sub').textContent.includes(msg.slice(0,20)))setSub();},6000);}
 };
 function duck(on){try{if(AC){on?AC.suspend():AC.resume();}}catch(e){}try{if('speechSynthesis' in window){on?speechSynthesis.pause():speechSynthesis.resume();}}catch(e){}}
 (function wireMic(){const b=$('#mic');
