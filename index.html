@@ -156,6 +156,9 @@ input[type=text],input[type=password],input[type=number],select{background:#120e
 .why{background:var(--panel2);border-left:3px solid var(--brass);padding:8px 11px;margin:8px 0;font-size:13px;color:#d9ccb6}
 .why.bad{border-left-color:var(--bad)}
 .book{width:min(900px,100%)}
+.bkbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+#t-book.book{width:auto;font-size:13px}
+#t-book .say{white-space:normal}
 .book h3{margin:18px 0 6px;font:500 21px/1.25 var(--disp);color:var(--brass2)}
 .book h4{margin:14px 0 6px}
 .say{display:inline-block;background:#2b2118;border:1px solid #5a4632;border-radius:3px;padding:1px 7px;margin:2px 2px;font:500 12.5px var(--body);color:var(--brass2);white-space:nowrap}
@@ -204,10 +207,11 @@ table.bk td:first-child{font-weight:600;color:var(--brass2);white-space:nowrap}
    <div id="thinking" hidden>Counsel is conferring…</div>
   </section>
   <aside id="side">
-   <nav id="tabs"><button data-t="file" class="on">Case file</button><button data-t="rul">Rulings<em id="rul-badge" hidden>!</em></button><button data-t="tx">Transcript</button></nav>
+   <nav id="tabs"><button data-t="file" class="on">Case file</button><button data-t="rul">Rulings<em id="rul-badge" hidden>!</em></button><button data-t="tx">Transcript</button><button data-t="book" id="tab-book" hidden>Bench book</button></nav>
    <div class="tabp" id="t-file"></div>
    <div class="tabp" id="t-rul" hidden></div>
    <div class="tabp" id="t-tx" hidden><div id="tx"></div></div>
+   <div class="tabp book" id="t-book" hidden></div>
   </aside>
  </main>
  <footer id="cmd">
@@ -264,7 +268,7 @@ table.bk td:first-child{font-weight:600;color:var(--brass2);white-space:nowrap}
 <div class="ov" id="docov" hidden><div class="paper" id="paper"></div></div>
 <div class="ov" id="genov" hidden><div class="card" id="gencard"></div></div>
 
-<div class="ov" id="bookov" hidden><div class="card book"><button class="btn ghost" id="bookx" style="float:right;padding:6px 12px">Close</button><div class="sub">What you can say from the bench</div><h2>Bench book</h2><div id="bookbody"></div></div></div>
+<div class="ov" id="bookov" hidden><div class="card book"><div style="float:right;display:flex;gap:6px"><button class="btn" id="bookdock" style="padding:6px 12px">Dock in side panel</button><button class="btn ghost" id="bookx" style="padding:6px 12px">Close</button></div><div class="sub">What you can say from the bench</div><h2>Bench book</h2><div id="bookbody"></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script>
 /* =====================================================================
    CASE FILES — Harlan County Circuit Court, Courtroom 4B
@@ -1032,7 +1036,7 @@ function renderRulings(){const c=C();if(!c){$('#t-rul').innerHTML='';return;}
  let h='<h4>Pretrial motions</h4>'+c.motions.map(m=>{const r=G.rulings[m.id];return `<div class="rul"><small>${esc(G.cast[m.by]?G.cast[m.by].name:'')}</small><b>${esc(m.title)}</b><p>${esc(m.text)}</p><div class="r ${r==null?'pend':''}">${r==null?'Awaiting ruling':esc('Ruled: '+m.options[r])}</div></div>`;}).join('');
  if(G.objs.length)h+='<h4>Objections</h4>'+G.objs.map(o=>`<div class="rul"><small>${esc(o.byName)} · ${esc(o.grounds)}</small><p>“${esc(o.q)}”</p><div class="r">${o.ruled?esc(o.ruled==='sustain'?'Sustained':'Overruled'):'Pending'}</div></div>`).join('');
  $('#t-rul').innerHTML=h;}
-function tab(t){document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['file','rul','tx'].forEach(k=>$('#t-'+k).hidden=k!==t);if(t==='rul')$('#rul-badge').hidden=true;}
+function tab(t){document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['file','rul','tx','book'].forEach(k=>$('#t-'+k).hidden=k!==t);if(t==='book')renderDockBook();if(t==='rul')$('#rul-badge').hidden=true;}
 function openDoc(id){const c=C();const d=c.docs.find(x=>x.id===id);if(!d)return;
  let h=`<button class="x" id="dx">Close</button><div class="dh">${esc(d.head||d.title)}<small>${esc(c.title.toUpperCase())} · CASE ${esc(c.docket)}</small></div>`;
  if(G.excluded.has(d.id))h+='<div class="stamp">EXCLUDED</div>';else if(d.stamp)h+=`<div class="stamp">${esc(d.stamp)}</div>`;
@@ -1061,7 +1065,7 @@ function nextClicked(){ctx();
 }
 async function startCase(i){
  if(i>=CASES.length){return endDay();}
- G.i=i;G.rulings={};G.objs=[];G.beat=0;G.excluded=new Set();G.verdict=null;G.sent=null;G.aiObjs=0;G.onStand=null;$('#tx').innerHTML='';G.tx=[];
+ G.i=i;bookCase=null;G.rulings={};G.objs=[];G.beat=0;G.excluded=new Set();G.verdict=null;G.sent=null;G.aiObjs=0;G.onStand=null;$('#tx').innerHTML='';G.tx=[];
  const c=C();loadCast(c);renderFile();renderRulings();tab('file');
  $('#cp-title').textContent=c.title;$('#cp-sub').textContent=`${c.docket} · ${c.tier}`;$('#s-docket').textContent=`${i+1} / ${CASES.length}`;
  setPhase('Call');
@@ -1475,8 +1479,8 @@ const ASK={
  hale:{w1:['Detective, did Mr. Hale object to the search?','Did you have a warrant for the apartment?','How did you find the pawn record?'],w2:['Mr. Albright, were you wearing your glasses that evening?','How many photos were you shown?'],w3:['Doctor, can you tell when the print was left?','Which side of the window was the print on?'],dft:['Mr. Hale, where were you on September fourth?']},
  varga:{w1:['Detective, did she ask for a lawyer?','Was the gun safe empty?','What was in her car trunk?'],w2:['Doctor, what were the injuries on her neck?','How far away was the gun when it fired?'],w3:['Ms. Shah, what did you hear that night?','Had you called the police about that house before?'],dft:['Ms. Varga, what happened in the kitchen?']}};
 function q(s){return '<span class="say">“'+esc(s)+'”</span>';}
-function openBook(which){
- const cur=C();const idx=which!=null?which:(G.i>=0?G.i:0);const c=CASES[idx];
+function bookHTML(which){
+ const idx=which!=null?which:(G.i>=0?G.i:0);const c=CASES[idx];
  const now=G.phase&&G.phase!=='End'?`<div class="now"><small>Right now · ${esc(G.phase)}</small><p>${G.dOpts?'A ruling is waiting. Say one of: '+G.dOpts.map(o=>q(o.split('—')[0].trim())).join(' '):'Say '+sayHints().map(h=>'<span class="say">'+esc(h)+'</span>').join(' or ')}</p></div>`:'';
  const stages=`<h3>Every trial, step by step</h3><div class="tblw"><table class="bk"><tr><th>Stage</th><th>What happens</th><th>Things you can say</th></tr>
  <tr><td>Start</td><td>Court opens, the clerk calls the case.</td><td>${q('Call the next case')} ${q('Let’s begin')}</td></tr>
@@ -1500,10 +1504,22 @@ function openBook(which){
  <h4>Questions worth asking</h4><ul>${asks}</ul>
  <h4>Verdict</h4><p>${c.verdicts.map(v=>q(v.label.split('—')[0].trim())).join(' ')}</p>
  <h4>Sentencing (only after a guilty finding)</h4><p class="hint">${esc(sent.note||'')}</p><p>Say the numbers and any terms: ${ex?ex+'. ':''}${q(sent.kind==='felony'?'Thirty six months in state prison and restitution, impose sentence':sent.kind==='infraction'?'A fine of 200 dollars, impose sentence':'Nine months probation, a 250 dollar fine and community service, impose sentence')}</p>`;
- $('#bookbody').innerHTML=now+stages+'<h3>Case by case</h3>'+tabs+cs;
- $('#bookov').hidden=false;
- $('#bookbody').querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>openBook(+b.dataset.bk));
+ return now+stages+'<h3>Case by case</h3>'+tabs+cs;
 }
+let bookCase=null,bookDocked=false;
+function wireBook(el,docked){el.querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>{bookCase=+b.dataset.bk;docked?renderDockBook():openBook(bookCase);});}
+function openBook(which){
+ if(bookDocked){tab('book');renderDockBook();return;}
+ if(which!=null)bookCase=which;$('#bookbody').innerHTML=bookHTML(bookCase);$('#bookov').hidden=false;wireBook($('#bookbody'),false);}
+function renderDockBook(){const el=$('#t-book');if(!el)return;const top=el.scrollTop;
+ el.innerHTML='<div class="bkbar"><span class="hint">Docked. Updates as the trial moves on.</span><button class="tb" id="bk-pop">Pop out</button></div>'+bookHTML(bookCase);
+ el.scrollTop=top;wireBook(el,true);$('#bk-pop').onclick=()=>{bookDocked=false;saveDock();tab('file');openBook(bookCase);};}
+function dockBook(){bookDocked=true;saveDock();$('#bookov').hidden=true;$('#tab-book').hidden=false;tab('book');renderDockBook();}
+function saveDock(){try{localStorage.setItem('court4b.dock',bookDocked?'1':'');}catch(e){}$('#tab-book').hidden=!bookDocked;}
+setInterval(()=>{if(bookDocked&&!$('#t-book').hidden){const k=G.phase+'|'+G.i+'|'+(G.dOpts?G.dOpts.join():'')+'|'+G.beat;if(k!==renderDockBook.k){renderDockBook.k=k;if(bookCase==null||bookCase===G.i)renderDockBook();}}},500);
+try{if(localStorage.getItem('court4b.dock')){bookDocked=true;}}catch(e){}
+$('#tab-book').hidden=!bookDocked;
+$('#bookdock').onclick=dockBook;
 $('#bookov').addEventListener('click',e=>{if(e.target.id==='bookov'||e.target.id==='bookx')$('#bookov').hidden=true;});
 </script>
 </body></html>
