@@ -216,6 +216,7 @@ input[type=text],input[type=password],input[type=number],select{background:#120e
    <label class="wide">Gemini API key (optional)<input type="password" id="i-key" placeholder="Paste a key from Google AI Studio" autocomplete="off"></label>
   </div>
   <p class="hint">The key stays in this browser and is sent only to Google's Gemini API. Without one, the trial runs from its written script, and characters give short stock replies to your questions.</p>
+  <p class="hint">When you take the bench, your browser will ask to use the microphone. Choose <b>Allow</b> so you can speak to the court.</p>
   <div class="row"><button class="btn" id="go">Take the bench</button><button class="btn ghost" id="go-set">More settings</button></div>
  </div>
 </div>
@@ -1296,8 +1297,6 @@ let micAsked=false;
 async function requestMic(){if(micAsked||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return;micAsked=true;
  try{const st=await navigator.mediaDevices.getUserMedia({audio:true});st.getTracks().forEach(t=>t.stop());Mic.granted=true;}
  catch(e){micAsked=false;}}
-requestMic();
-document.addEventListener('pointerdown',()=>requestMic(),{once:true,capture:true});
 $('#go').addEventListener('click',()=>requestMic());
 </script>
 </body></html>
